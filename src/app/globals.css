@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f6f1e7;
+  --paper-strong: #fffdf8;
+  --ink: #1b1914;
+  --ink-soft: #4a453c;
+  --pine: #1d3d32;
+  --moss: #2f6b52;
+  --copper: #b86a3d;
+  --sand: #e4d8c4;
+  --line: #d7ccb8;
+  --danger: #8f2d2d;
+  --ok: #1f6b45;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-strong: var(--paper-strong);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-pine: var(--pine);
+  --color-moss: var(--moss);
+  --color-copper: var(--copper);
+  --color-sand: var(--sand);
+  --color-line: var(--line);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --font-sans: var(--font-figtree);
+  --font-serif: var(--font-fraunces);
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  background:
+    radial-gradient(1200px 500px at 10% -10%, rgba(47, 107, 82, 0.08), transparent),
+    radial-gradient(900px 400px at 100% 0%, rgba(184, 106, 61, 0.08), transparent),
+    var(--paper);
+  color: var(--ink);
+  min-height: 100%;
+}
+
+a {
+  color: inherit;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.75rem 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: transform 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn-primary {
+  background: var(--pine);
+  color: #f7f3eb;
+}
+
+.btn-secondary {
+  background: var(--paper-strong);
+  color: var(--pine);
+  border: 1px solid var(--line);
+}
+
+.btn-copper {
+  background: var(--copper);
+  color: #fffaf3;
+}
+
+.card {
+  background: var(--paper-strong);
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 0 rgba(27, 25, 20, 0.03);
+}
+
+.field {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #fffdf8;
+  border-radius: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  color: var(--ink);
+}
+
+.field:focus {
+  outline: 2px solid var(--moss);
+  outline-offset: 1px;
+}
+
+.label {
+  display: block;
+  font-size: 0.86rem;
+  font-weight: 650;
+  margin-bottom: 0.35rem;
+  color: var(--ink-soft);
+}
