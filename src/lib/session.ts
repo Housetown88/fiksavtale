@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import type { Role } from "@prisma/client";
 import { db } from "./db";
 import { hashSessionToken, randomToken } from "./crypto";
-import { canUseDatabase, sessionSecret } from "./database-url";
+import { sessionSecret } from "./database-url";
 
 function tokenHash(token: string): string {
   return hashSessionToken(token, sessionSecret());
@@ -55,42 +55,35 @@ export async function destroySession() {
 }
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
-  // cookies() må kalles først — ellers tror Next.js at layout er statisk
-  // når databasen er utilgjengelig, og `next build` på Vercel krasjer.
   const jar = await cookies();
-  if (!canUseDatabase().ok) return null;
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  try {
-    const session = await db.session.findUnique({
-      where: { tokenHash: tokenHash(token) },
-      include: {
-        user: { include: { providerProfile: true } },
-      },
-    });
-    if (!session || session.expiresAt < new Date()) {
-      if (session) {
-        await db.session.delete({ where: { id: session.id } });
-      }
-      return null;
+  const session = await db.session.findUnique({
+    where: { tokenHash: tokenHash(token) },
+    include: {
+      user: { include: { providerProfile: true } },
+    },
+  });
+  if (!session || session.expiresAt < new Date()) {
+    if (session) {
+      await db.session.delete({ where: { id: session.id } });
     }
-    return {
-      id: session.user.id,
-      email: session.user.email,
-      name: session.user.name,
-      role: session.user.role,
-      phone: session.user.phone,
-      providerProfile: session.user.providerProfile
-        ? {
-            companyName: session.user.providerProfile.companyName,
-            orgNumber: session.user.providerProfile.orgNumber,
-            orgVerified: session.user.providerProfile.orgVerified,
-          }
-        : null,
-    };
-  } catch {
     return null;
   }
+  return {
+    id: session.user.id,
+    email: session.user.email,
+    name: session.user.name,
+    role: session.user.role,
+    phone: session.user.phone,
+    providerProfile: session.user.providerProfile
+      ? {
+          companyName: session.user.providerProfile.companyName,
+          orgNumber: session.user.providerProfile.orgNumber,
+          orgVerified: session.user.providerProfile.orgVerified,
+        }
+      : null,
+  };
 }
 
 export async function requireUser(): Promise<SessionUser> {
