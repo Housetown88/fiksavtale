@@ -55,8 +55,10 @@ export async function destroySession() {
 }
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
-  if (!canUseDatabase().ok) return null;
+  // cookies() må kalles først — ellers tror Next.js at layout er statisk
+  // når databasen er utilgjengelig, og `next build` på Vercel krasjer.
   const jar = await cookies();
+  if (!canUseDatabase().ok) return null;
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const session = await db.session.findUnique({
