@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MAX_JOB_IMAGES } from "@/lib/job-images";
+import { MAX_JOB_IMAGES } from "@/lib/job-image-limits";
 
 export function JobImagePicker() {
   const [previews, setPreviews] = useState<string[]>([]);

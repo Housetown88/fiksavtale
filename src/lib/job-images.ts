@@ -1,9 +1,12 @@
 import type { PrismaClient } from "@prisma/client";
 import sharp from "sharp";
+import {
+  JOB_IMAGE_TYPES,
+  MAX_JOB_IMAGE_BYTES,
+  MAX_JOB_IMAGES,
+} from "./job-image-limits";
 
-export const MAX_JOB_IMAGES = 6;
-export const MAX_JOB_IMAGE_BYTES = 5 * 1024 * 1024;
-export const JOB_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+export { JOB_IMAGE_TYPES, MAX_JOB_IMAGE_BYTES, MAX_JOB_IMAGES };
 
 const MAGIC = {
   jpeg: [0xff, 0xd8, 0xff],
