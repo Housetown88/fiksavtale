@@ -265,7 +265,7 @@ export async function ensureDemoJobImages(db: PrismaClient, jobId?: string) {
         include: { _count: { select: { images: true } } },
       })
     : await db.job.findFirst({
-        where: { title: { contains: "Sikringsskap" } },
+        where: { title: { contains: "ikringsskap" } },
         include: { _count: { select: { images: true } } },
       });
   if (!job || job._count.images > 0) return;
