@@ -19,6 +19,13 @@ export const metadata: Metadata = {
   title: "Jobbenmin — avtale først, kontakt etter betaling",
   description:
     "Norsk markedsplass for tjenester. Kunder legger ut oppdrag, bedrifter gir tilbud, og kontakt låses opp først når betaling er bekreftet.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180" }],
+  },
 };
 
 // Alltid dynamisk: ellers prerendrer `next build` på Vercel sider som treffer Prisma
