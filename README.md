@@ -53,11 +53,20 @@ SQLite-fil virker **ikke** på Vercel serverless. Sett en ekstern database:
 | `SEED_DEMO` | Nei (anbefalt på preview) | `1` = så DEMO-data når basen er tom. Risiko: demo-kontoer i feil miljø. |
 | `SEED_RESET` | Nei | `1` = tøm basen og så på nytt. **Farlig** mot delt/prod-database. |
 
-Prisma-klienten opprettes **ikke** ved import. Mangler eller ugyldig `DATABASE_URL` på Vercel gir en norsk statusmelding på forsiden — ikke en hard 500.
+Prisma-klienten opprettes **ikke** ved import. Mangler eller fil-SQLite `DATABASE_URL` på Vercel gir en norsk statusmelding på forsiden — ikke en hard 500.
 
 Etter deploy uten database: forsiden lastes med advarsel. Med gyldig `DATABASE_URL`, `db:push` og `SEED_DEMO=1` vises Oslo-oppdrag.
 
 **Minimum for at preview skal vise mer enn advarselen:** `DATABASE_URL` (Neon/Turso) + `SESSION_SECRET` (eller `AUTH_SECRET`) + `DEMO_WEBHOOK_SECRET`. Deretter `npm run db:push` mot den samme URL-en.
+
+### Hvis Vercel-deploy feiler på noen få sekunder
+
+Da er det ofte prosjektinnstillinger, ikke appen. Sjekk **Build Logs** på deployen (ikke bare GitHub-statusen):
+
+1. **Ikke sett `NODE_ENV` i Vercel.** Next setter `production` under `next build`. `NODE_ENV=development` knuser Next 16-bygget.
+2. `DATABASE_URL` må være `postgresql://…` (Neon) eller `libsql://…` (Turso). `file:./dev.db` virker ikke på serverless.
+3. Ikke lim inn hermetegn rundt verdien (`"postgresql://…"`).
+4. Hobby-kvote / avbrutte bygg: åpne [jobbenmin på Vercel](https://vercel.com/andershuseby88-5389/jobbenmin) og les feilmeldingen på siste deploy.
 
 ## DEMO-kontoer
 

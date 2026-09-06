@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { JobCard, Alert } from "@/components/ui";
+import { JobCard } from "@/components/ui";
+import { DatabaseStatus } from "@/components/DatabaseStatus";
 import { formatNok, DEFAULT_PLATFORM_FEE_BPS, calcCommission } from "@/lib/money";
 import { getPlatformFeeBps } from "@/lib/settings";
 import { maybeSeedDemo } from "@/lib/demo-seed";
+import { canUseDatabase } from "@/lib/database-url";
 
 export default async function HomePage() {
   let jobs: {
@@ -19,17 +21,22 @@ export default async function HomePage() {
   let feeBps = DEFAULT_PLATFORM_FEE_BPS;
   let dbError: string | null = null;
 
-  try {
-    await maybeSeedDemo(db);
-    jobs = await db.job.findMany({
-      where: { status: "OPEN" },
-      orderBy: { createdAt: "desc" },
-      take: 3,
-    });
-    feeBps = await getPlatformFeeBps(db);
-  } catch {
-    dbError =
-      "Kunne ikke hente oppdrag akkurat nå. Sjekk at DATABASE_URL peker på en tilgjengelig database (Neon/Turso på Vercel — ikke SQLite-fil), og at tabellene er opprettet.";
+  const availability = canUseDatabase();
+  if (!availability.ok) {
+    dbError = availability.message;
+  } else {
+    try {
+      await maybeSeedDemo(db);
+      jobs = await db.job.findMany({
+        where: { status: "OPEN" },
+        orderBy: { createdAt: "desc" },
+        take: 3,
+      });
+      feeBps = await getPlatformFeeBps(db);
+    } catch {
+      dbError =
+        "Kunne ikke hente oppdrag akkurat nå. Sjekk at DATABASE_URL peker på Neon eller Turso, og at tabellene er opprettet med npm run db:push.";
+    }
   }
 
   const example = calcCommission(500_000, feeBps);
@@ -69,7 +76,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {dbError ? <Alert tone="warn">{dbError}</Alert> : null}
+      {dbError ? <DatabaseStatus message={dbError} /> : null}
 
       <section className="grid gap-4 md:grid-cols-3">
         {[

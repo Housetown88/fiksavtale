@@ -1,7 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Fil-SQLite virker ikke på Vercel. Preview/prod bruker DATABASE_URL (Neon/Turso).
+  // Webpack (Vercel kan bruke dette i stedet for Turbopack) må ikke parse
+  // Turso/libSQL-pakkene — de trekker inn README/LICENSE og krasjer bygget.
+  serverExternalPackages: [
+    "@prisma/adapter-libsql",
+    "@libsql/client",
+    "@libsql/isomorphic-ws",
+    "@libsql/hrana-client",
+    "libsql",
+  ],
 };
 
 export default nextConfig;

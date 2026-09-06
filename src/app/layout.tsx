@@ -21,6 +21,10 @@ export const metadata: Metadata = {
     "Norsk markedsplass for tjenester. Kunder legger ut oppdrag, bedrifter gir tilbud, og kontakt låses opp først når betaling er bekreftet.",
 };
 
+// Alltid dynamisk: ellers prerendrer `next build` på Vercel sider som treffer Prisma
+// når DATABASE_URL mangler eller er fil-SQLite.
+export const dynamic = "force-dynamic";
+
 export default async function RootLayout({
   children,
 }: {
