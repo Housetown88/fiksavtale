@@ -15,6 +15,7 @@
     "test:watch": "vitest"
   },
   "prisma": {
+    "schema": "prisma/schema.prisma",
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {

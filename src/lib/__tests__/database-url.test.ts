@@ -5,6 +5,7 @@ import {
   isLibsqlUrl,
   isPostgresUrl,
 } from "../database-url";
+import { schemaPath } from "../../../scripts/prisma-env.mjs";
 
 const originalVercel = process.env.VERCEL;
 const originalUrl = process.env.DATABASE_URL;
@@ -36,5 +37,13 @@ describe("database-url", () => {
 
     process.env.DATABASE_URL = "postgresql://user:pass@host/db";
     expect(canUseDatabase().ok).toBe(true);
+  });
+
+  it("velger postgres-skjema for postgresql-URL (Vercel-default)", () => {
+    process.env.DATABASE_URL = "postgresql://user:pass@host/db";
+    expect(schemaPath()).toBe("prisma/schema.prisma");
+
+    process.env.DATABASE_URL = "file:./dev.db";
+    expect(schemaPath()).toBe("prisma/schema.sqlite.prisma");
   });
 });

@@ -10,7 +10,7 @@ Dette er **ikke** en kopi av Mittanbud. Merkevare, språk og flyt er egne.
 
 ```bash
 npm install
-npx prisma db push
+npm run db:push
 npm run db:seed
 npm run dev
 ```
@@ -38,7 +38,7 @@ SQLite-fil virker **ikke** på Vercel serverless. Sett en ekstern database:
 3. Sett miljøvariablene under i Vercel-prosjektet **jobbenmin** (Preview + Production).
 4. For DEMO-innhold på preview: sett `SEED_DEMO=1`. Første request mot tom base sår kontoer. **Ikke bruk dette mot ekte produksjonsdata** — det kan opprette demo-brukere, og `SEED_RESET=1` sletter alt.
 
-`prisma generate` kjøres i `postinstall` og `npm run build` (velger sqlite- eller postgres-skjema ut fra `DATABASE_URL`).
+`prisma/schema.prisma` er **PostgreSQL** (det Vercel og `prisma generate` uten flagg bruker). Lokalt med `file:./dev.db` genereres `prisma/schema.sqlite.prisma` via `postinstall` / `npm run db:push`. Ikke kjør `npx prisma generate` lokalt mot SQLite-URL uten `--schema=prisma/schema.sqlite.prisma`.
 
 ### Miljøvariabler som må settes i Vercel
 

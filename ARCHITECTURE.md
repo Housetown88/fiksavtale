@@ -32,7 +32,7 @@ API (samme tilgangskontroll som UI):
 
 ## Datamodell
 
-Kjerneentiteter i `prisma/schema.prisma`:
+Kjerneentiteter i `prisma/schema.prisma` (PostgreSQL). Lokalt SQLite: `prisma/schema.sqlite.prisma`.
 
 - `User` + `CustomerProfile` / `ProviderProfile`
 - `Job` (offentlig område + privat `addressLine`)

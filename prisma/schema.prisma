@@ -1,10 +1,14 @@
+// Standardskjema (PostgreSQL / Neon).
+// Vercel og `prisma generate` uten --schema bruker denne filen.
+// Lokalt med file:./dev.db: se prisma/schema.sqlite.prisma.
+
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

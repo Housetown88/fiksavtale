@@ -1,5 +1,5 @@
-// Synk modellene med prisma/schema.prisma (SQLite).
-// Denne filen brukes når DATABASE_URL er Postgres/Neon.
+// Lokalt SQLite (file:./dev.db) og Turso/libSQL.
+// Vercel med postgresql:// skal IKKE bruke denne filen.
 
 generator client {
   provider      = "prisma-client-js"
@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
