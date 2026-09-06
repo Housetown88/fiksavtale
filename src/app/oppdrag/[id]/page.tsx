@@ -10,6 +10,7 @@ import { getPlatformFeeBps } from "@/lib/settings";
 import { acceptOfferAction } from "@/app/actions";
 import { Alert, FeeBox, PageTitle, StatusBadge, VerifiedBadge } from "@/components/ui";
 import { OfferForm, ReportForm } from "@/components/forms";
+import { JobImageGallery } from "@/components/JobImages";
 import { formatNok } from "@/lib/money";
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -43,6 +44,11 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         where: { jobId: job.id, OR: [{ customerId: user.id }, { providerId: user.id }] },
       })
     : null;
+  const images = await db.jobImage.findMany({
+    where: { jobId: job.id },
+    select: { id: true },
+    orderBy: { sortOrder: "asc" },
+  });
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
@@ -65,6 +71,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             </p>
           ) : null}
         </div>
+        <JobImageGallery jobId={job.id} images={images} />
 
         {contact && contact.unlocked ? (
           <div className="card mt-4 p-5">

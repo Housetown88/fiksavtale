@@ -74,7 +74,7 @@ Passord for alle: `Demo1234!`
 
 | Rolle | E-post | Merknad |
 | --- | --- | --- |
-| Kunde | `kari@demo.jobbenmin.no` | Åpne oppdrag + booking som venter på betaling |
+| Kunde | `kari@demo.jobbenmin.no` | Åpne oppdrag (med demo-bilder) + booking som venter på betaling |
 | Kunde | `ola@demo.jobbenmin.no` | Betalt booking (kontakt låst opp) og fullført jobb med anmeldelse |
 | Bedrift | `bjorn@nordfjell.no` | Nordfjell Elektro AS |
 | Bedrift | `silje@osloror.no` | Oslo Rør & Bad AS |
@@ -109,7 +109,7 @@ Ekte Stripe Connect, PSD2 og utbetalingsoppsett må verifiseres med advokat og b
 - `GET /api/jobs/[id]/contact` krever innlogget part **og** serverbekreftet betaling.
 - Tilbud og meldinger er isolert mellom partene.
 - Tekstfilter stopper telefon, e-post og URL-er. Vennlig norsk feilmelding; brukeren kan rette teksten (også ved falske positiver).
-- Vedlegg er slått av i v1.
+- **Oppdragsbilder (DEMO-lagring):** JPEG/PNG/WebP, maks 6 filer à 5 MB. Bildene re-kodes til JPEG på serveren (EXIF/GPS strippes). Bytene lagres i databasen (`JobImage`, Neon ByteA / SQLite blob) og vises via `/api/jobs/[id]/images/[imageId]` med samme tilgang som oppdragssiden. Filsystem/Vercel Blob brukes **ikke** — det overlever serverless-restart. **Ingen OCR** av bilder i denne MVP-en: tekst/telefon i selve bildet kan fortsatt lekke. Chat-vedlegg er fortsatt slått av.
 
 ## Juridiske forbehold
 
@@ -124,7 +124,8 @@ Merket **«Org.nr sjekket»** betyr format + kontrollsiffer i DEMO. Det er ikke 
 - Milepælsbetaling og befaring (egne stubsider)
 - Betalingsløp for godkjente tillegg
 - Automatisk refusjon og tvistenemnd
-- GDPR-innsyn/sletting, e-postvarsler, filvedlegg
+- GDPR-innsyn/sletting, e-postvarsler, chat-filvedlegg
+- OCR / visuell kontaktfiltrering av oppdragsbilder
 - Produksjonshosting, rate limiting og pentest
 
 Se [ARCHITECTURE.md](./ARCHITECTURE.md) for sider, datamodell og tilstandsmaskin.

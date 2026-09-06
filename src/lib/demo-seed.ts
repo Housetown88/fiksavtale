@@ -11,6 +11,7 @@ import {
 } from "./domain";
 import { createPaymentIntent, handlePaymentWebhook } from "./payments";
 import { orgNumberWithChecksum } from "./orgnr";
+import { createDemoJobImage } from "./job-images";
 
 export async function resetDemoData(db: PrismaClient) {
   await db.payment.deleteMany();
@@ -23,6 +24,7 @@ export async function resetDemoData(db: PrismaClient) {
   await db.offer.deleteMany();
   await db.report.deleteMany();
   await db.auditLog.deleteMany();
+  await db.jobImage.deleteMany();
   await db.job.deleteMany();
   await db.session.deleteMany();
   await db.customerProfile.deleteMany();
@@ -186,6 +188,8 @@ export async function populateDemoData(db: PrismaClient) {
     budgetMaxOre: 400_000,
   });
 
+  await ensureDemoJobImages(db, openJob.id);
+
   const openOffer = await createOffer(db, viewer(bjorn), {
     jobId: openJob.id,
     amountOre: 580_000,
@@ -254,6 +258,46 @@ export async function populateDemoData(db: PrismaClient) {
   });
 }
 
+export async function ensureDemoJobImages(db: PrismaClient, jobId?: string) {
+  const job = jobId
+    ? await db.job.findUnique({
+        where: { id: jobId },
+        include: { _count: { select: { images: true } } },
+      })
+    : await db.job.findFirst({
+        where: { title: { contains: "Sikringsskap" } },
+        include: { _count: { select: { images: true } } },
+      });
+  if (!job || job._count.images > 0) return;
+
+  const demoPhotoBefore = await createDemoJobImage("Sikringsskap — før", { r: 29, g: 61, b: 50 });
+  const demoPhotoDetail = await createDemoJobImage("Sikringsskap — detalj", { r: 184, g: 106, b: 61 });
+  await db.jobImage.createMany({
+    data: [
+      {
+        jobId: job.id,
+        mimeType: demoPhotoBefore.mimeType,
+        width: demoPhotoBefore.width,
+        height: demoPhotoBefore.height,
+        sizeBytes: demoPhotoBefore.sizeBytes,
+        data: demoPhotoBefore.data,
+        thumb: demoPhotoBefore.thumb,
+        sortOrder: 0,
+      },
+      {
+        jobId: job.id,
+        mimeType: demoPhotoDetail.mimeType,
+        width: demoPhotoDetail.width,
+        height: demoPhotoDetail.height,
+        sizeBytes: demoPhotoDetail.sizeBytes,
+        data: demoPhotoDetail.data,
+        thumb: demoPhotoDetail.thumb,
+        sortOrder: 1,
+      },
+    ],
+  });
+}
+
 let seedInFlight: Promise<void> | null = null;
 
 export async function maybeSeedDemo(db: PrismaClient): Promise<boolean> {
@@ -261,8 +305,11 @@ export async function maybeSeedDemo(db: PrismaClient): Promise<boolean> {
   if (!seedInFlight) {
     seedInFlight = (async () => {
       const users = await db.user.count();
-      if (users > 0) return;
-      await populateDemoData(db);
+      if (users === 0) {
+        await populateDemoData(db);
+        return;
+      }
+      await ensureDemoJobImages(db);
     })().catch((error) => {
       seedInFlight = null;
       console.error("SEED_DEMO feilet (databasen kan allerede ha data, eller mangle tabeller):", error);

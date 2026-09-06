@@ -9,7 +9,13 @@ const nextConfig: NextConfig = {
     "@libsql/isomorphic-ws",
     "@libsql/hrana-client",
     "libsql",
+    "sharp",
   ],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "32mb",
+    },
+  },
 };
 
 export default nextConfig;

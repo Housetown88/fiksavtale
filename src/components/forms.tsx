@@ -14,6 +14,7 @@ import {
   type ActionState,
 } from "@/app/actions";
 import { JOB_CATEGORIES, OSLO_AREAS } from "@/lib/categories";
+import { JobImagePicker } from "./JobImages";
 import { Alert } from "./ui";
 
 function ErrorBox({ state }: { state: ActionState }) {
@@ -170,6 +171,7 @@ export function JobForm() {
           <input className="field" name="budgetMax" type="number" min={0} />
         </label>
       </div>
+      <JobImagePicker />
       <p className="text-sm text-ink-soft">
         Ikke skriv telefon, e-post eller lenker her. Filteret stopper det med en forklaring, og du kan rette teksten.
       </p>

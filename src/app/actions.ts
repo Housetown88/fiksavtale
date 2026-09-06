@@ -24,6 +24,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { createPaymentIntent, handlePaymentWebhook } from "@/lib/payments";
 import { nokToOre } from "@/lib/money";
 import { AuthzError } from "@/lib/authz";
+import { collectJobImageFiles, saveJobImages } from "@/lib/job-images";
 
 export type ActionState = { error?: string; ok?: boolean };
 
@@ -89,6 +90,12 @@ export async function createJobAction(_prev: ActionState, formData: FormData): P
       budgetMinOre: min ? nokToOre(min) : undefined,
       budgetMaxOre: max ? nokToOre(max) : undefined,
     });
+    try {
+      await saveJobImages(db, job.id, collectJobImageFiles(formData));
+    } catch (error) {
+      await db.job.delete({ where: { id: job.id } });
+      throw error;
+    }
     redirect(`/oppdrag/${job.id}`);
   } catch (error) {
     if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;

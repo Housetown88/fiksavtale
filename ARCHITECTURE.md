@@ -36,6 +36,7 @@ Kjerneentiteter i `prisma/schema.prisma` (PostgreSQL). Lokalt SQLite: `prisma/sc
 
 - `User` + `CustomerProfile` / `ProviderProfile`
 - `Job` (offentlig område + privat `addressLine`)
+- `JobImage` (re-kodet JPEG + miniatyr i databasen; DEMO-lagring)
 - `Offer`, `Conversation`, `Message`
 - `Booking` (pris, gebyr, `contactUnlockedAt`)
 - `PaymentIntent`, `Payment` (`eventId` unikt)

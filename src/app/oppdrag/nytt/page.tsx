@@ -12,7 +12,7 @@ export default async function NewJobPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <PageTitle kicker="Nytt oppdrag" title="Fortell hva som skal fikses">
-        Skriv område, ikke telefonnummer. Adressen låses til den betalte bookingen.
+        Skriv område, ikke telefonnummer. Adressen låses til den betalte bookingen. Du kan legge ved bilder av jobben.
       </PageTitle>
       <div className="card p-5">
         <JobForm />

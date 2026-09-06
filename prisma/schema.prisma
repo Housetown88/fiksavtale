@@ -144,6 +144,23 @@ model Job {
   conversations Conversation[]
   booking       Booking?
   reports       Report[]
+  images        JobImage[]
+}
+
+model JobImage {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  mimeType  String
+  width     Int
+  height    Int
+  sizeBytes Int
+  data      Bytes
+  thumb     Bytes
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([jobId, sortOrder])
 }
 
 model Offer {
