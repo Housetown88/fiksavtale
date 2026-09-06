@@ -3,10 +3,7 @@ export function isVercelRuntime(): boolean {
 }
 
 export function databaseUrl(override?: string): string {
-  if (override) return override;
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  if (isVercelRuntime()) return "";
-  return "file:./dev.db";
+  return override ?? process.env.DATABASE_URL ?? "file:./dev.db";
 }
 
 export function isPostgresUrl(url = databaseUrl()): boolean {

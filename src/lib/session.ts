@@ -61,32 +61,36 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   if (!canUseDatabase().ok) return null;
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  const session = await db.session.findUnique({
-    where: { tokenHash: tokenHash(token) },
-    include: {
-      user: { include: { providerProfile: true } },
-    },
-  });
-  if (!session || session.expiresAt < new Date()) {
-    if (session) {
-      await db.session.delete({ where: { id: session.id } });
+  try {
+    const session = await db.session.findUnique({
+      where: { tokenHash: tokenHash(token) },
+      include: {
+        user: { include: { providerProfile: true } },
+      },
+    });
+    if (!session || session.expiresAt < new Date()) {
+      if (session) {
+        await db.session.delete({ where: { id: session.id } });
+      }
+      return null;
     }
+    return {
+      id: session.user.id,
+      email: session.user.email,
+      name: session.user.name,
+      role: session.user.role,
+      phone: session.user.phone,
+      providerProfile: session.user.providerProfile
+        ? {
+            companyName: session.user.providerProfile.companyName,
+            orgNumber: session.user.providerProfile.orgNumber,
+            orgVerified: session.user.providerProfile.orgVerified,
+          }
+        : null,
+    };
+  } catch {
     return null;
   }
-  return {
-    id: session.user.id,
-    email: session.user.email,
-    name: session.user.name,
-    role: session.user.role,
-    phone: session.user.phone,
-    providerProfile: session.user.providerProfile
-      ? {
-          companyName: session.user.providerProfile.companyName,
-          orgNumber: session.user.providerProfile.orgNumber,
-          orgVerified: session.user.providerProfile.orgVerified,
-        }
-      : null,
-  };
 }
 
 export async function requireUser(): Promise<SessionUser> {

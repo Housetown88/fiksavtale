@@ -1,26 +1,10 @@
 import { PrismaClient } from "@prisma/client";
-import {
-  canUseDatabase,
-  DatabaseUnavailableError,
-  databaseUrl,
-  isLibsqlUrl,
-} from "./database-url";
+import { databaseUrl, isLibsqlUrl } from "./database-url";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 export function createPrisma(overrideUrl?: string) {
-  if (!overrideUrl) {
-    const availability = canUseDatabase();
-    if (!availability.ok) {
-      throw new DatabaseUnavailableError(availability.message);
-    }
-  }
-
   const url = databaseUrl(overrideUrl);
-  if (!url) {
-    throw new DatabaseUnavailableError();
-  }
-
   if (isLibsqlUrl(url)) {
     // Lastes bare for Turso. webpackIgnore: webpack skal ikke folde inn pakken.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -32,7 +16,11 @@ export function createPrisma(overrideUrl?: string) {
     return new PrismaClient({ adapter });
   }
 
-  return new PrismaClient({ datasources: { db: { url } } });
+  return new PrismaClient(
+    overrideUrl || process.env.DATABASE_URL
+      ? { datasources: { db: { url } } }
+      : undefined,
+  );
 }
 
 function getClient(): PrismaClient {

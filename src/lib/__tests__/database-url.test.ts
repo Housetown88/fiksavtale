@@ -1,12 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   canUseDatabase,
-  DatabaseUnavailableError,
   isFileSqliteUrl,
   isLibsqlUrl,
   isPostgresUrl,
 } from "../database-url";
-import { createPrisma } from "../db";
 
 const originalVercel = process.env.VERCEL;
 const originalUrl = process.env.DATABASE_URL;
@@ -38,11 +36,5 @@ describe("database-url", () => {
 
     process.env.DATABASE_URL = "postgresql://user:pass@host/db";
     expect(canUseDatabase().ok).toBe(true);
-  });
-
-  it("lar ikke Prisma-klienten konstrueres uten gyldig URL på Vercel", () => {
-    process.env.VERCEL = "1";
-    delete process.env.DATABASE_URL;
-    expect(() => createPrisma()).toThrow(DatabaseUnavailableError);
   });
 });
