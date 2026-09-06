@@ -1,17 +1,37 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { JobCard } from "@/components/ui";
-import { formatNok } from "@/lib/money";
+import { JobCard, Alert } from "@/components/ui";
+import { formatNok, DEFAULT_PLATFORM_FEE_BPS, calcCommission } from "@/lib/money";
 import { getPlatformFeeBps } from "@/lib/settings";
-import { calcCommission } from "@/lib/money";
+import { maybeSeedDemo } from "@/lib/demo-seed";
 
 export default async function HomePage() {
-  const jobs = await db.job.findMany({
-    where: { status: "OPEN" },
-    orderBy: { createdAt: "desc" },
-    take: 3,
-  });
-  const feeBps = await getPlatformFeeBps(db);
+  let jobs: {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    area: string;
+    budgetMinOre: number | null;
+    budgetMaxOre: number | null;
+    status: string;
+  }[] = [];
+  let feeBps = DEFAULT_PLATFORM_FEE_BPS;
+  let dbError: string | null = null;
+
+  try {
+    await maybeSeedDemo(db);
+    jobs = await db.job.findMany({
+      where: { status: "OPEN" },
+      orderBy: { createdAt: "desc" },
+      take: 3,
+    });
+    feeBps = await getPlatformFeeBps(db);
+  } catch {
+    dbError =
+      "Kunne ikke hente oppdrag akkurat nå. Sjekk at DATABASE_URL peker på en tilgjengelig database (Neon/Turso på Vercel — ikke SQLite-fil), og at tabellene er opprettet.";
+  }
+
   const example = calcCommission(500_000, feeBps);
 
   return (
@@ -49,6 +69,8 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {dbError ? <Alert tone="warn">{dbError}</Alert> : null}
+
       <section className="grid gap-4 md:grid-cols-3">
         {[
           ["1. Legg ut eller gi tilbud", "Gratis å registrere, legge ut og by. Bedrifter oppgir org.nr."],
@@ -69,11 +91,15 @@ export default async function HomePage() {
             Alle oppdrag
           </Link>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {jobs.map((job) => (
-            <JobCard key={job.id} job={job} />
-          ))}
-        </div>
+        {jobs.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-3">
+            {jobs.map((job) => (
+              <JobCard key={job.id} job={job} />
+            ))}
+          </div>
+        ) : !dbError ? (
+          <p className="text-ink-soft">Ingen åpne oppdrag ennå. Logg inn som kunde og legg ut det første.</p>
+        ) : null}
       </section>
     </div>
   );

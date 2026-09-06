@@ -15,7 +15,7 @@ export async function setupTestDb(): Promise<PrismaClient> {
   const testUrl = `file:${testDb}`;
   if (fs.existsSync(testDb)) fs.unlinkSync(testDb);
   // New empty file — do not use --force-reset (blocked for AI agents).
-  execSync("npx prisma db push --skip-generate", {
+  execSync("npx prisma db push --skip-generate --schema=prisma/schema.prisma", {
     env: { ...process.env, DATABASE_URL: testUrl },
     stdio: "pipe",
   });

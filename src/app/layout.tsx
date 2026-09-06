@@ -26,7 +26,12 @@ export default async function RootLayout({
 }: {
   children: ReactNode;
 }) {
-  const user = await getCurrentUser();
+  let user = null;
+  try {
+    user = await getCurrentUser();
+  } catch {
+    user = null;
+  }
   return (
     <html lang="nb" className={`${figtree.variable} ${fraunces.variable} h-full`}>
       <body className="min-h-full font-sans antialiased">

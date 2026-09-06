@@ -1,7 +1,12 @@
 import { cookies } from "next/headers";
 import type { Role } from "@prisma/client";
 import { db } from "./db";
-import { randomToken, sha256 } from "./crypto";
+import { hashSessionToken, randomToken } from "./crypto";
+import { sessionSecret } from "./database-url";
+
+function tokenHash(token: string): string {
+  return hashSessionToken(token, sessionSecret());
+}
 
 export const SESSION_COOKIE = "jobbenmin_session";
 const SESSION_DAYS = 14;
@@ -24,7 +29,7 @@ export async function createSession(userId: string): Promise<string> {
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
   await db.session.create({
     data: {
-      tokenHash: sha256(token),
+      tokenHash: tokenHash(token),
       userId,
       expiresAt,
     },
@@ -44,7 +49,7 @@ export async function destroySession() {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) {
-    await db.session.deleteMany({ where: { tokenHash: sha256(token) } });
+    await db.session.deleteMany({ where: { tokenHash: tokenHash(token) } });
   }
   jar.delete(SESSION_COOKIE);
 }
@@ -54,7 +59,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const session = await db.session.findUnique({
-    where: { tokenHash: sha256(token) },
+    where: { tokenHash: tokenHash(token) },
     include: {
       user: { include: { providerProfile: true } },
     },

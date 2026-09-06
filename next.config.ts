@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  outputFileTracingIncludes: {
-    "/*": ["./public/dev.db"],
-  },
+  // Fil-SQLite virker ikke på Vercel. Preview/prod bruker DATABASE_URL (Neon/Turso).
 };
 
 export default nextConfig;

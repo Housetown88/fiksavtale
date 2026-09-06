@@ -23,7 +23,39 @@ Tester:
 npm test
 ```
 
-Miljøvariabler: kopier `.env.example` til `.env`. `DATABASE_URL` peker på SQLite-filen `prisma/dev.db`.
+Miljøvariabler: kopier `.env.example` til `.env`. Lokalt peker `DATABASE_URL` på SQLite-filen `prisma/dev.db`.
+
+## Vercel (preview/produksjon)
+
+SQLite-fil virker **ikke** på Vercel serverless. Sett en ekstern database:
+
+1. Opprett **Neon Postgres** (anbefalt) eller **Turso/libSQL**.
+2. Kjør skjema mot den eksterne basen (én gang), fra laptop med URL i miljøet:
+   ```bash
+   DATABASE_URL="postgresql://..." npm run db:push
+   ```
+   For Turso: `DATABASE_URL="libsql://....turso.io" TURSO_AUTH_TOKEN="..." npm run db:push` (sqlite-skjema + libSQL).
+3. Sett miljøvariablene under i Vercel-prosjektet **jobbenmin** (Preview + Production).
+4. For DEMO-innhold på preview: sett `SEED_DEMO=1`. Første request mot tom base sår kontoer. **Ikke bruk dette mot ekte produksjonsdata** — det kan opprette demo-brukere, og `SEED_RESET=1` sletter alt.
+
+`prisma generate` kjøres i `postinstall` og `npm run build` (velger sqlite- eller postgres-skjema ut fra `DATABASE_URL`).
+
+### Miljøvariabler som må settes i Vercel
+
+| Variabel | Påkrevd | Eksempel / merknad |
+| --- | --- | --- |
+| `DATABASE_URL` | Ja | Neon: `postgresql://USER:PASSWORD@HOST/DB?sslmode=require`. Turso: `libsql://DB-ORG.turso.io`. **Ikke** `file:./dev.db`. |
+| `TURSO_AUTH_TOKEN` | Bare Turso | Auth-token fra Turso. Alias: `DATABASE_AUTH_TOKEN`. |
+| `SESSION_SECRET` | Ja | Lang tilfeldig streng. Alias: `AUTH_SECRET` (samme formål). |
+| `AUTH_SECRET` | Nei | Brukes hvis `SESSION_SECRET` mangler. |
+| `DEMO_WEBHOOK_SECRET` | Ja | Hemmelighet for signering av DEMO-betalingswebhook. |
+| `PLATFORM_FEE_BPS` | Nei | Standard `1000` (10 %). |
+| `SEED_DEMO` | Nei (anbefalt på preview) | `1` = så DEMO-data når basen er tom. Risiko: demo-kontoer i feil miljø. |
+| `SEED_RESET` | Nei | `1` = tøm basen og så på nytt. **Farlig** mot delt/prod-database. |
+
+Etter deploy: forsiden skal laste uten 500 selv om basen er tom (da vises norsk melding). Med `SEED_DEMO=1` og ferdig `db:push` vises Oslo-oppdrag.
+
+## DEMO-kontoer
 
 ## DEMO-kontoer
 

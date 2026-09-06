@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
-import { JobCard, PageTitle } from "@/components/ui";
+import { Alert, JobCard, PageTitle } from "@/components/ui";
 import { JOB_CATEGORIES, OSLO_AREAS } from "@/lib/categories";
+import { maybeSeedDemo } from "@/lib/demo-seed";
 
 export default async function JobsPage({
   searchParams,
@@ -8,7 +9,11 @@ export default async function JobsPage({
   searchParams: Promise<{ q?: string; category?: string; area?: string }>;
 }) {
   const params = await searchParams;
-  const jobs = await db.job.findMany({
+  let jobs: Awaited<ReturnType<typeof db.job.findMany>> = [];
+  let dbError: string | null = null;
+  try {
+    await maybeSeedDemo(db);
+    jobs = await db.job.findMany({
     where: {
       status: "OPEN",
       category: params.category || undefined,
@@ -21,13 +26,17 @@ export default async function JobsPage({
         : undefined,
     },
     orderBy: { createdAt: "desc" },
-  });
+    });
+  } catch {
+    dbError = "Kunne ikke hente oppdrag. Databasen er utilgjengelig eller ikke klargjort.";
+  }
 
   return (
     <div>
       <PageTitle kicker="Markedsplass" title="Åpne oppdrag">
         Område vises, men eksakt gateadresse er skjult til betalingen er bekreftet.
       </PageTitle>
+      {dbError ? <Alert tone="warn">{dbError}</Alert> : null}
       <form className="card mb-6 grid gap-3 p-4 md:grid-cols-4" method="get">
         <input className="field" name="q" placeholder="Søk" defaultValue={params.q} />
         <select className="field" name="category" defaultValue={params.category ?? ""}>

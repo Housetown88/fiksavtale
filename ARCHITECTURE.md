@@ -1,6 +1,6 @@
 # Arkitektur — Jobbenmin
 
-Prototypen er en Next.js App Router-app (TypeScript) med Prisma + SQLite, øktbasert innlogging og et DEMO-betalingsløp. Merkevaren er Jobbenmin; jobbenmin.no er tiltenkt merkevare-domene og er ikke bekreftet som ledig eller registrert her.
+Prototypen er en Next.js App Router-app (TypeScript) med Prisma, øktbasert innlogging og et DEMO-betalingsløp. Lokalt brukes SQLite (`file:./dev.db`). På Vercel brukes Neon Postgres eller Turso/libSQL via `DATABASE_URL` — fil-SQLite virker ikke i serverless. Merkevaren er Jobbenmin; jobbenmin.no er tiltenkt merkevare-domene og er ikke bekreftet som ledig eller registrert her.
 
 ## Sider
 
