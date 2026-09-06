@@ -1,0 +1,424 @@
+import type { PrismaClient } from "@prisma/client";
+import { assertNoContactLeak } from "./leak-filter";
+import { calcCommission } from "./money";
+import { isValidOrgNumber, normalizeOrgNumber } from "./orgnr";
+import { getPlatformFeeBps } from "./settings";
+import { AuthzError, type Viewer } from "./authz";
+import bcrypt from "bcryptjs";
+
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 10);
+}
+
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(password, hash);
+}
+
+export async function registerUser(
+  db: PrismaClient,
+  input: {
+    email: string;
+    password: string;
+    name: string;
+    phone?: string;
+    role: "CUSTOMER" | "PROVIDER";
+    area?: string;
+    addressLine?: string;
+    postalCode?: string;
+    city?: string;
+    companyName?: string;
+    orgNumber?: string;
+    about?: string;
+    serviceAreas?: string;
+  },
+) {
+  const email = input.email.trim().toLowerCase();
+  const existing = await db.user.findUnique({ where: { email } });
+  if (existing) {
+    throw new Error("Det finnes allerede en konto med denne e-postadressen.");
+  }
+  if (input.password.length < 8) {
+    throw new Error("Passordet må ha minst 8 tegn.");
+  }
+  if (input.role === "PROVIDER") {
+    if (!input.companyName || !input.orgNumber) {
+      throw new Error("Firmakonto krever firmanavn og organisasjonsnummer.");
+    }
+    if (!isValidOrgNumber(input.orgNumber)) {
+      throw new Error("Organisasjonsnummeret er ugyldig (sjekk siffer og kontrollsiffer).");
+    }
+    if (input.about) assertNoContactLeak(input.about);
+  }
+
+  const user = await db.user.create({
+    data: {
+      email,
+      passwordHash: await hashPassword(input.password),
+      name: input.name.trim(),
+      phone: input.phone?.trim() || null,
+      role: input.role,
+      customerProfile:
+        input.role === "CUSTOMER"
+          ? {
+              create: {
+                area: input.area ?? null,
+                addressLine: input.addressLine ?? null,
+                postalCode: input.postalCode ?? null,
+                city: input.city ?? "Oslo",
+              },
+            }
+          : undefined,
+      providerProfile:
+        input.role === "PROVIDER"
+          ? {
+              create: {
+                companyName: input.companyName!,
+                orgNumber: normalizeOrgNumber(input.orgNumber!),
+                orgVerified: true,
+                about: input.about ?? null,
+                serviceAreas: input.serviceAreas ?? null,
+                invoiceEmail: email,
+              },
+            }
+          : undefined,
+    },
+  });
+  return user;
+}
+
+export async function createJob(
+  db: PrismaClient,
+  viewer: Viewer,
+  input: {
+    title: string;
+    description: string;
+    category: string;
+    area: string;
+    postalCode?: string;
+    addressLine?: string;
+    budgetMinOre?: number;
+    budgetMaxOre?: number;
+  },
+) {
+  if (viewer.role !== "CUSTOMER" && viewer.role !== "ADMIN") {
+    throw new AuthzError("Bare kunder kan legge ut oppdrag", 403);
+  }
+  assertNoContactLeak(input.title);
+  assertNoContactLeak(input.description);
+  if (!input.title.trim() || !input.description.trim()) {
+    throw new Error("Tittel og beskrivelse må fylles ut.");
+  }
+  return db.job.create({
+    data: {
+      customerId: viewer.id,
+      title: input.title.trim(),
+      description: input.description.trim(),
+      category: input.category,
+      area: input.area.trim(),
+      postalCode: input.postalCode?.trim() || null,
+      addressLine: input.addressLine?.trim() || null,
+      budgetMinOre: input.budgetMinOre ?? null,
+      budgetMaxOre: input.budgetMaxOre ?? null,
+    },
+  });
+}
+
+export async function createOffer(
+  db: PrismaClient,
+  viewer: Viewer,
+  input: { jobId: string; amountOre: number; message: string },
+) {
+  if (viewer.role !== "PROVIDER") {
+    throw new AuthzError("Bare registrerte bedrifter kan sende tilbud", 403);
+  }
+  const provider = await db.user.findUnique({
+    where: { id: viewer.id },
+    include: { providerProfile: true },
+  });
+  if (!provider?.providerProfile) {
+    throw new AuthzError("Firmaprofil mangler", 403);
+  }
+  if (input.amountOre < 10000) {
+    throw new Error("Tilbudet må være minst 100 NOK.");
+  }
+  assertNoContactLeak(input.message);
+
+  const job = await db.job.findUnique({ where: { id: input.jobId } });
+  if (!job || job.status !== "OPEN") {
+    throw new Error("Oppdraget er ikke åpent for nye tilbud.");
+  }
+  if (job.customerId === viewer.id) {
+    throw new Error("Du kan ikke gi tilbud på eget oppdrag.");
+  }
+
+  const existing = await db.offer.findFirst({
+    where: { jobId: job.id, providerId: viewer.id, status: "PENDING" },
+  });
+  if (existing) {
+    throw new Error("Du har allerede et aktivt tilbud på dette oppdraget.");
+  }
+
+  const offer = await db.offer.create({
+    data: {
+      jobId: job.id,
+      providerId: viewer.id,
+      amountOre: input.amountOre,
+      message: input.message.trim(),
+    },
+  });
+
+  await db.conversation.upsert({
+    where: { jobId_providerId: { jobId: job.id, providerId: viewer.id } },
+    update: { offerId: offer.id },
+    create: {
+      jobId: job.id,
+      providerId: viewer.id,
+      customerId: job.customerId,
+      offerId: offer.id,
+    },
+  });
+
+  return offer;
+}
+
+export async function sendMessage(
+  db: PrismaClient,
+  viewer: Viewer,
+  input: { conversationId: string; body: string },
+) {
+  const conversation = await db.conversation.findUnique({
+    where: { id: input.conversationId },
+  });
+  if (!conversation) {
+    throw new AuthzError("Samtalen finnes ikke", 404);
+  }
+  if (viewer.id !== conversation.customerId && viewer.id !== conversation.providerId) {
+    throw new AuthzError("Du har ikke tilgang til denne samtalen", 403);
+  }
+  if (!input.body.trim()) {
+    throw new Error("Meldingen kan ikke være tom.");
+  }
+  assertNoContactLeak(input.body);
+  return db.message.create({
+    data: {
+      conversationId: conversation.id,
+      senderId: viewer.id,
+      body: input.body.trim(),
+    },
+  });
+}
+
+export async function acceptOffer(
+  db: PrismaClient,
+  viewer: Viewer,
+  offerId: string,
+) {
+  const offer = await db.offer.findUnique({
+    where: { id: offerId },
+    include: { job: true },
+  });
+  if (!offer) throw new AuthzError("Tilbudet finnes ikke", 404);
+  if (offer.job.customerId !== viewer.id && viewer.role !== "ADMIN") {
+    throw new AuthzError("Bare kunden kan godta et tilbud", 403);
+  }
+  if (offer.status !== "PENDING" || offer.job.status !== "OPEN") {
+    throw new Error("Tilbudet kan ikke godtas nå.");
+  }
+
+  const platformFeeBps = await getPlatformFeeBps(db);
+  const { platformFeeOre, providerPayoutOre } = calcCommission(offer.amountOre, platformFeeBps);
+
+  const booking = await db.$transaction(async (tx) => {
+    await tx.offer.update({
+      where: { id: offer.id },
+      data: { status: "ACCEPTED" },
+    });
+    await tx.offer.updateMany({
+      where: { jobId: offer.jobId, id: { not: offer.id }, status: "PENDING" },
+      data: { status: "REJECTED" },
+    });
+    await tx.job.update({
+      where: { id: offer.jobId },
+      data: { status: "OFFER_ACCEPTED" },
+    });
+    return tx.booking.create({
+      data: {
+        jobId: offer.jobId,
+        offerId: offer.id,
+        customerId: offer.job.customerId,
+        providerId: offer.providerId,
+        amountOre: offer.amountOre,
+        platformFeeOre,
+        providerPayoutOre,
+        platformFeeBps,
+        status: "PENDING_PAYMENT",
+      },
+    });
+  });
+
+  return booking;
+}
+
+export async function markWorkStarted(db: PrismaClient, viewer: Viewer, bookingId: string) {
+  const booking = await db.booking.findUnique({ where: { id: bookingId } });
+  if (!booking) throw new AuthzError("Bookingen finnes ikke", 404);
+  if (booking.providerId !== viewer.id && viewer.role !== "ADMIN") {
+    throw new AuthzError("Bare utførende bedrift kan starte arbeidet", 403);
+  }
+  if (booking.status !== "PAID") {
+    throw new Error("Arbeidet kan først startes etter bekreftet betaling.");
+  }
+  return db.$transaction(async (tx) => {
+    await tx.job.update({ where: { id: booking.jobId }, data: { status: "IN_PROGRESS" } });
+    return tx.booking.update({
+      where: { id: booking.id },
+      data: { status: "IN_PROGRESS", workStartedAt: new Date() },
+    });
+  });
+}
+
+export async function completeBooking(db: PrismaClient, viewer: Viewer, bookingId: string) {
+  const booking = await db.booking.findUnique({ where: { id: bookingId } });
+  if (!booking) throw new AuthzError("Bookingen finnes ikke", 404);
+  if (booking.customerId !== viewer.id && viewer.role !== "ADMIN") {
+    throw new AuthzError("Bare kunden kan godkjenne ferdig arbeid", 403);
+  }
+  if (booking.status !== "IN_PROGRESS" && booking.status !== "PAID") {
+    throw new Error("Bookingen kan ikke fullføres i denne tilstanden.");
+  }
+  return db.$transaction(async (tx) => {
+    await tx.job.update({ where: { id: booking.jobId }, data: { status: "COMPLETED" } });
+    return tx.booking.update({
+      where: { id: booking.id },
+      data: { status: "COMPLETED", completedAt: new Date() },
+    });
+  });
+}
+
+export async function createReview(
+  db: PrismaClient,
+  viewer: Viewer,
+  input: { bookingId: string; rating: number; comment: string },
+) {
+  const booking = await db.booking.findUnique({ where: { id: input.bookingId } });
+  if (!booking) throw new AuthzError("Bookingen finnes ikke", 404);
+  if (booking.status !== "COMPLETED") {
+    throw new Error("Anmeldelse kan bare skrives etter fullført, betalt oppdrag.");
+  }
+  if (viewer.id !== booking.customerId) {
+    throw new AuthzError("I denne prototypen kan bare kunden anmelde bedriften", 403);
+  }
+  if (input.rating < 1 || input.rating > 5) {
+    throw new Error("Vurdering må være mellom 1 og 5.");
+  }
+  assertNoContactLeak(input.comment);
+  const existing = await db.review.findUnique({ where: { bookingId: booking.id } });
+  if (existing) {
+    throw new Error("Dette oppdraget er allerede anmeldt.");
+  }
+  return db.review.create({
+    data: {
+      bookingId: booking.id,
+      authorId: viewer.id,
+      targetId: booking.providerId,
+      rating: input.rating,
+      comment: input.comment.trim(),
+    },
+  });
+}
+
+export async function createReport(
+  db: PrismaClient,
+  viewer: Viewer,
+  input: { reason: string; details?: string; targetUserId?: string; targetJobId?: string },
+) {
+  if (!input.reason.trim()) {
+    throw new Error("Oppgi en grunn for rapporten.");
+  }
+  return db.report.create({
+    data: {
+      reporterId: viewer.id,
+      reason: input.reason.trim(),
+      details: input.details?.trim() || null,
+      targetUserId: input.targetUserId ?? null,
+      targetJobId: input.targetJobId ?? null,
+    },
+  });
+}
+
+export async function proposeExtra(
+  db: PrismaClient,
+  viewer: Viewer,
+  input: { bookingId: string; title: string; amountOre: number },
+) {
+  const booking = await db.booking.findUnique({ where: { id: input.bookingId } });
+  if (!booking) throw new AuthzError("Bookingen finnes ikke", 404);
+  if (booking.providerId !== viewer.id && viewer.role !== "ADMIN") {
+    throw new AuthzError("Bare bedriften kan foreslå tillegg", 403);
+  }
+  if (!["PAID", "IN_PROGRESS"].includes(booking.status)) {
+    throw new Error("Tillegg kan bare foreslås på aktive, betalte bookinger.");
+  }
+  assertNoContactLeak(input.title);
+  return db.extraCharge.create({
+    data: {
+      bookingId: booking.id,
+      title: input.title.trim(),
+      amountOre: input.amountOre,
+    },
+  });
+}
+
+export async function decideExtra(
+  db: PrismaClient,
+  viewer: Viewer,
+  extraId: string,
+  decision: "APPROVED" | "REJECTED",
+) {
+  const extra = await db.extraCharge.findUnique({
+    where: { id: extraId },
+    include: { booking: true },
+  });
+  if (!extra) throw new AuthzError("Tillegget finnes ikke", 404);
+  if (extra.booking.customerId !== viewer.id && viewer.role !== "ADMIN") {
+    throw new AuthzError("Bare kunden kan godkjenne tillegg", 403);
+  }
+  return db.extraCharge.update({
+    where: { id: extra.id },
+    data: { status: decision },
+  });
+}
+
+export async function cancelBooking(
+  db: PrismaClient,
+  viewer: Viewer,
+  bookingId: string,
+  reason: string,
+) {
+  const booking = await db.booking.findUnique({ where: { id: bookingId } });
+  if (!booking) throw new AuthzError("Bookingen finnes ikke", 404);
+  if (
+    viewer.role !== "ADMIN" &&
+    viewer.id !== booking.customerId &&
+    viewer.id !== booking.providerId
+  ) {
+    throw new AuthzError("Du kan ikke avbestille denne bookingen", 403);
+  }
+  if (["COMPLETED", "REFUNDED"].includes(booking.status)) {
+    throw new Error("Bookingen kan ikke avbestilles i denne tilstanden.");
+  }
+  return db.$transaction(async (tx) => {
+    await tx.job.update({
+      where: { id: booking.jobId },
+      data: { status: "CANCELLED" },
+    });
+    return tx.booking.update({
+      where: { id: booking.id },
+      data: {
+        status: booking.status === "PENDING_PAYMENT" ? "CANCELLED" : "CANCELLED",
+        cancelledAt: new Date(),
+        cancelReason: reason,
+      },
+    });
+  });
+}

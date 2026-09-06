@@ -1,0 +1,124 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
+import { formatNok } from "@/lib/money";
+import { PageTitle, StatusBadge } from "@/components/ui";
+
+export default async function OverviewPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/logg-inn");
+
+  const jobs = await db.job.findMany({
+    where: user.role === "CUSTOMER" ? { customerId: user.id } : undefined,
+    include: { booking: true, offers: true },
+    orderBy: { createdAt: "desc" },
+    take: user.role === "PROVIDER" ? 8 : 20,
+  });
+  const bookings = await db.booking.findMany({
+    where:
+      user.role === "ADMIN"
+        ? undefined
+        : user.role === "CUSTOMER"
+          ? { customerId: user.id }
+          : { providerId: user.id },
+    include: { job: true },
+    orderBy: { createdAt: "desc" },
+  });
+  const offers = user.role === "PROVIDER"
+    ? await db.offer.findMany({
+        where: { providerId: user.id },
+        include: { job: true },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
+
+  const earned = bookings
+    .filter((booking) => ["PAID", "IN_PROGRESS", "COMPLETED"].includes(booking.status))
+    .reduce((sum, booking) => sum + booking.providerPayoutOre, 0);
+  const fees = bookings
+    .filter((booking) => ["PAID", "IN_PROGRESS", "COMPLETED"].includes(booking.status))
+    .reduce((sum, booking) => sum + booking.platformFeeOre, 0);
+
+  return (
+    <div className="space-y-8">
+      <PageTitle kicker="Oversikt" title={`Hei, ${user.name}`}>
+        {user.role === "PROVIDER"
+          ? "Her ser du tilbud, bookinger og forventet utbetaling."
+          : "Dine oppdrag og bookinger."}
+      </PageTitle>
+
+      {user.role === "PROVIDER" ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="card p-4">
+            <p className="text-sm text-ink-soft">Forventet utbetaling (betalte jobber)</p>
+            <p className="font-serif text-3xl">{formatNok(earned)}</p>
+          </div>
+          <div className="card p-4">
+            <p className="text-sm text-ink-soft">Plattformgebyr trukket</p>
+            <p className="font-serif text-3xl">{formatNok(fees)}</p>
+          </div>
+        </div>
+      ) : null}
+
+      <section>
+        <h2 className="font-serif text-2xl">Bookinger</h2>
+        <div className="mt-3 space-y-2">
+          {bookings.map((booking) => (
+            <Link key={booking.id} href={`/booking/${booking.id}`} className="card flex items-center justify-between p-4">
+              <div>
+                <p className="font-semibold">{booking.job.title}</p>
+                <p className="text-sm text-ink-soft">
+                  {formatNok(booking.amountOre)} · gebyr {formatNok(booking.platformFeeOre)}
+                </p>
+              </div>
+              <StatusBadge status={booking.status} />
+            </Link>
+          ))}
+          {bookings.length === 0 ? <p className="text-sm text-ink-soft">Ingen bookinger ennå.</p> : null}
+        </div>
+      </section>
+
+      {user.role === "CUSTOMER" || user.role === "ADMIN" ? (
+        <section>
+          <div className="flex items-center justify-between">
+            <h2 className="font-serif text-2xl">Oppdrag</h2>
+            <Link href="/oppdrag/nytt" className="text-sm font-semibold text-moss">
+              Nytt oppdrag
+            </Link>
+          </div>
+          <div className="mt-3 space-y-2">
+            {jobs
+              .filter((job) => user.role === "ADMIN" || job.customerId === user.id)
+              .map((job) => (
+                <Link key={job.id} href={`/oppdrag/${job.id}`} className="card flex items-center justify-between p-4">
+                  <div>
+                    <p className="font-semibold">{job.title}</p>
+                    <p className="text-sm text-ink-soft">{job.offers.length} tilbud</p>
+                  </div>
+                  <StatusBadge status={job.status} />
+                </Link>
+              ))}
+          </div>
+        </section>
+      ) : null}
+
+      {user.role === "PROVIDER" ? (
+        <section>
+          <h2 className="font-serif text-2xl">Dine tilbud</h2>
+          <div className="mt-3 space-y-2">
+            {offers.map((offer) => (
+              <Link key={offer.id} href={`/oppdrag/${offer.jobId}`} className="card flex items-center justify-between p-4">
+                <div>
+                  <p className="font-semibold">{offer.job.title}</p>
+                  <p className="text-sm text-ink-soft">{formatNok(offer.amountOre)}</p>
+                </div>
+                <StatusBadge status={offer.status} />
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
