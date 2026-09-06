@@ -1,6 +1,6 @@
-# Arkitektur — Fiksavtale
+# Arkitektur — Jobbenmin
 
-Prototypen er en Next.js App Router-app (TypeScript) med Prisma + SQLite, øktbasert innlogging og et DEMO-betalingsløp.
+Prototypen er en Next.js App Router-app (TypeScript) med Prisma + SQLite, øktbasert innlogging og et DEMO-betalingsløp. Merkevaren er Jobbenmin; jobbenmin.no er tiltenkt merkevare-domene og er ikke bekreftet som ledig eller registrert her.
 
 ## Sider
 

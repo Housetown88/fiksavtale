@@ -5,7 +5,7 @@ export default function TermsPage() {
     <article className="prose-like mx-auto max-w-2xl space-y-4">
       <PageTitle title="Vilkår (utkast, ikke juridisk råd)" />
       <p>
-        Dette er et arbeidsutkast for prototypen Fiksavtale. Teksten er ikke gjennomgått av advokat og skal ikke
+        Dette er et arbeidsutkast for prototypen Jobbenmin. Teksten er ikke gjennomgått av advokat og skal ikke
         behandles som gjeldende avtalevilkår.
       </p>
       <ul className="list-disc space-y-2 pl-5 text-sm">

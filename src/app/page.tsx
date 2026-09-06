@@ -23,7 +23,7 @@ export default async function HomePage() {
             Avtale først.<br />Kontakt etter betaling.
           </h1>
           <p className="mt-4 max-w-xl text-lg text-ink-soft">
-            Fiksavtale er en markedsplass der kunder legger ut jobb, verifiserte bedrifter gir tilbud, og
+            Jobbenmin er en markedsplass der kunder legger ut jobb, verifiserte bedrifter gir tilbud, og
             partene snakker i appen. Telefon, e-post og eksakt adresse låses opp først når betalingen er
             bekreftet på serveren — ikke av en suksess-side alene.
           </p>

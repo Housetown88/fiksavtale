@@ -1,6 +1,8 @@
-# Fiksavtale
+# Jobbenmin
 
-Norsk Bokmål-prototype av en tjenestemarkedsplass (arbeidstittel). Kunder legger ut oppdrag, registrerte bedrifter sender tilbud, partene chatter i appen, og **kontaktopplysninger låses opp først når bookingen er betalt og bekreftet på serveren**.
+Norsk Bokmål-prototype av en tjenestemarkedsplass. Kunder legger ut oppdrag, registrerte bedrifter sender tilbud, partene chatter i appen, og **kontaktopplysninger låses opp først når bookingen er betalt og bekreftet på serveren**.
+
+Tiltenkt merkevare-domene: **jobbenmin.no** (ikke bekreftet som ledig eller registrert i denne prototypen). GitHub-repositoriet heter fortsatt `fiksavtale`.
 
 Dette er **ikke** en kopi av Mittanbud. Merkevare, språk og flyt er egne.
 
@@ -29,11 +31,11 @@ Passord for alle: `Demo1234!`
 
 | Rolle | E-post | Merknad |
 | --- | --- | --- |
-| Kunde | `kari@demo.fiksavtale.no` | Åpne oppdrag + booking som venter på betaling |
-| Kunde | `ola@demo.fiksavtale.no` | Betalt booking (kontakt låst opp) og fullført jobb med anmeldelse |
+| Kunde | `kari@demo.jobbenmin.no` | Åpne oppdrag + booking som venter på betaling |
+| Kunde | `ola@demo.jobbenmin.no` | Betalt booking (kontakt låst opp) og fullført jobb med anmeldelse |
 | Bedrift | `bjorn@nordfjell.no` | Nordfjell Elektro AS |
 | Bedrift | `silje@osloror.no` | Oslo Rør & Bad AS |
-| Admin | `admin@fiksavtale.no` | Kontrollpanel og revisjonslogg |
+| Admin | `admin@demo.jobbenmin.no` | Kontrollpanel og revisjonslogg |
 
 ## Forretningsmodell
 

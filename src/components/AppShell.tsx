@@ -20,9 +20,9 @@ export function AppShell({
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Link href="/" className="flex items-center gap-2">
             <span className="grid h-9 w-9 place-items-center rounded-full bg-pine font-serif text-sm text-paper">
-              F
+              J
             </span>
-            <span className="font-serif text-xl tracking-tight">Fiksavtale</span>
+            <span className="font-serif text-xl tracking-tight">Jobbenmin</span>
           </Link>
           <nav className="hidden items-center gap-5 text-sm font-medium md:flex">
             <Link href="/oppdrag">Finn oppdrag</Link>
@@ -60,10 +60,11 @@ export function AppShell({
       <footer className="border-t border-line bg-paper-strong">
         <div className="mx-auto grid max-w-6xl gap-4 px-4 py-8 text-sm text-ink-soft md:grid-cols-3">
           <div>
-            <p className="font-serif text-lg text-ink">Fiksavtale</p>
+            <p className="font-serif text-lg text-ink">Jobbenmin</p>
             <p className="mt-2 max-w-xs">
-              Arbeidstittel for en norsk tjenestemarkedsplass. Forretningsidentitet vises tidlig; direkte kontakt
-              først etter betalt booking.
+              Norsk tjenestemarkedsplass. jobbenmin.no er tiltenkt merkevare-domene i prototypen — ikke bekreftet
+              som ledig eller registrert. Forretningsidentitet vises tidlig; direkte kontakt først etter betalt
+              booking.
             </p>
           </div>
           <div className="flex flex-col gap-1">

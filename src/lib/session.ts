@@ -3,7 +3,7 @@ import type { Role } from "@prisma/client";
 import { db } from "./db";
 import { randomToken, sha256 } from "./crypto";
 
-export const SESSION_COOKIE = "fiksavtale_session";
+export const SESSION_COOKIE = "jobbenmin_session";
 const SESSION_DAYS = 14;
 
 export type SessionUser = {

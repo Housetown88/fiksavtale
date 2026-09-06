@@ -40,7 +40,7 @@ async function main() {
 
   const kari = await db.user.create({
     data: {
-      email: "kari@demo.fiksavtale.no",
+      email: "kari@demo.jobbenmin.no",
       passwordHash: password,
       name: "Kari Nordmann",
       phone: "40011223",
@@ -58,7 +58,7 @@ async function main() {
 
   const ola = await db.user.create({
     data: {
-      email: "ola@demo.fiksavtale.no",
+      email: "ola@demo.jobbenmin.no",
       passwordHash: password,
       name: "Ola Hansen",
       phone: "40022334",
@@ -117,9 +117,9 @@ async function main() {
 
   await db.user.create({
     data: {
-      email: "admin@fiksavtale.no",
+      email: "admin@demo.jobbenmin.no",
       passwordHash: password,
-      name: "Fiksavtale admin",
+      name: "Jobbenmin admin",
       role: "ADMIN",
     },
   });
@@ -252,11 +252,11 @@ async function main() {
   });
 
   console.log("Sådd DEMO-data. Passord for alle kontoer: Demo1234!");
-  console.log("  Kunde:  kari@demo.fiksavtale.no");
-  console.log("  Kunde:  ola@demo.fiksavtale.no");
+  console.log("  Kunde:  kari@demo.jobbenmin.no");
+  console.log("  Kunde:  ola@demo.jobbenmin.no");
   console.log("  Bedrift: bjorn@nordfjell.no (Nordfjell Elektro AS)");
   console.log("  Bedrift: silje@osloror.no (Oslo Rør & Bad AS)");
-  console.log("  Admin:  admin@fiksavtale.no");
+  console.log("  Admin:  admin@demo.jobbenmin.no");
 }
 
 main()

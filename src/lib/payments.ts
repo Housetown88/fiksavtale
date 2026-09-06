@@ -3,7 +3,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { calcCommission } from "./money";
 
 export const DEMO_WEBHOOK_SECRET =
-  process.env.DEMO_WEBHOOK_SECRET ?? "fiksavtale-demo-webhook-secret-ikke-for-produksjon";
+  process.env.DEMO_WEBHOOK_SECRET ?? "jobbenmin-demo-webhook-secret-ikke-for-produksjon";
 
 export type WebhookEvent = {
   eventId: string;

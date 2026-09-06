@@ -16,7 +16,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Fiksavtale — avtale først, kontakt etter betaling",
+  title: "Jobbenmin — avtale først, kontakt etter betaling",
   description:
     "Norsk markedsplass for tjenester. Kunder legger ut oppdrag, bedrifter gir tilbud, og kontakt låses opp først når betaling er bekreftet.",
 };
