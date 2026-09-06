@@ -2,7 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import sharp from "sharp";
 import type { PrismaClient } from "@prisma/client";
 import { createTestUsers, setupTestDb } from "./helpers";
-import { createJob } from "../domain";
+import { acceptOffer, createJob, createOffer } from "../domain";
+import { AuthzError, getJobForViewer } from "../authz";
+import { canViewerSeeContact } from "../contact";
 import {
   JobImageError,
   MAX_JOB_IMAGES,
@@ -64,5 +66,35 @@ describe("oppdragsbilder", () => {
       Array.from({ length: MAX_JOB_IMAGES + 1 }, (_, index) => pngFile(`${index}.png`)),
     );
     await expect(saveJobImages(db, job.id, tooMany)).rejects.toBeInstanceOf(JobImageError);
+  });
+
+  it("viser bilder til bydende og booket utfører uten kontaktlås", async () => {
+    const users = await createTestUsers(db);
+    const job = await createJob(db, { id: users.customer.id, role: "CUSTOMER" }, {
+      title: "Bilder synlige ved bud",
+      description: "Utfører må se bildene før tilbud.",
+      category: "elektriker",
+      area: "Frogner",
+    });
+    await saveJobImages(db, job.id, [await pngFile("site.png")]);
+
+    const bidding = { id: users.provider.id, role: "PROVIDER" as const };
+    const assigned = bidding;
+    const other = { id: users.otherProvider.id, role: "PROVIDER" as const };
+
+    await expect(getJobForViewer(db, bidding, job.id)).resolves.toMatchObject({ id: job.id });
+    expect(await canViewerSeeContact(db, { viewerId: bidding.id, jobId: job.id })).toBe(false);
+    expect(await db.jobImage.count({ where: { jobId: job.id } })).toBe(1);
+
+    const offer = await createOffer(db, bidding, {
+      jobId: job.id,
+      amountOre: 250_000,
+      message: "Kan starte torsdag.",
+    });
+    await acceptOffer(db, { id: users.customer.id, role: "CUSTOMER" }, offer.id);
+
+    await expect(getJobForViewer(db, assigned, job.id)).resolves.toMatchObject({ id: job.id });
+    await expect(getJobForViewer(db, other, job.id)).rejects.toBeInstanceOf(AuthzError);
+    expect(await canViewerSeeContact(db, { viewerId: assigned.id, jobId: job.id })).toBe(false);
   });
 });

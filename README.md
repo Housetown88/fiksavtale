@@ -109,7 +109,7 @@ Ekte Stripe Connect, PSD2 og utbetalingsoppsett må verifiseres med advokat og b
 - `GET /api/jobs/[id]/contact` krever innlogget part **og** serverbekreftet betaling.
 - Tilbud og meldinger er isolert mellom partene.
 - Tekstfilter stopper telefon, e-post og URL-er. Vennlig norsk feilmelding; brukeren kan rette teksten (også ved falske positiver).
-- **Oppdragsbilder (DEMO-lagring):** JPEG/PNG/WebP, maks 6 filer à 5 MB. Bildene re-kodes til JPEG på serveren (EXIF/GPS strippes). Bytene lagres i databasen (`JobImage`, Neon ByteA / SQLite blob) og vises via `/api/jobs/[id]/images/[imageId]` med samme tilgang som oppdragssiden. Filsystem/Vercel Blob brukes **ikke** — det overlever serverless-restart. **Ingen OCR** av bilder i denne MVP-en: tekst/telefon i selve bildet kan fortsatt lekke. Chat-vedlegg er fortsatt slått av.
+- **Oppdragsbilder (DEMO-lagring):** JPEG/PNG/WebP, maks 6 filer à 5 MB. Bildene re-kodes til JPEG på serveren (EXIF/GPS strippes). Bytene lagres i databasen (`JobImage`) og vises via `/api/jobs/[id]/images/[imageId]`. **Kontaktlås gjelder ikke bilder** — bare telefon, e-post og eksakt adresse. Utførere som kan se et åpent oppdrag for å gi tilbud, og den bookede utføreren etter booking, skal se de samme bildene kunden lastet opp. Filsystem/Vercel Blob brukes **ikke**. **Ingen OCR** av bilder i denne MVP-en. Chat-vedlegg er slått av.
 
 ## Juridiske forbehold
 

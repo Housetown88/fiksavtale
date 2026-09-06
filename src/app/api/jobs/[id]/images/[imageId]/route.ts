@@ -11,6 +11,7 @@ export async function GET(
   try {
     const { id, imageId } = await params;
     const user = await getCurrentUser();
+    // Samme regel som oppdragssiden — ikke canViewerSeeContact.
     await getJobForViewer(db, user, id);
 
     const image = await db.jobImage.findFirst({

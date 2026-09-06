@@ -44,6 +44,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         where: { jobId: job.id, OR: [{ customerId: user.id }, { providerId: user.id }] },
       })
     : null;
+  // Bilder følger oppdragstilgang (getJobForViewer), ikke kontaktlås.
+  // Utførere som kan se/by på åpne oppdrag, og booket utfører, skal se bildene.
   const images = await db.jobImage.findMany({
     where: { jobId: job.id },
     select: { id: true },
