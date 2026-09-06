@@ -2,6 +2,12 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { JobCard } from "@/components/ui";
 import { DatabaseStatus } from "@/components/DatabaseStatus";
+import {
+  DemoNowCopy,
+  PaymentPlanBadge,
+  PlannedVippsCustomerCopy,
+  PlannedVippsProviderCopy,
+} from "@/components/PaymentCopy";
 import { formatNok, DEFAULT_PLATFORM_FEE_BPS, calcCommission } from "@/lib/money";
 import { getPlatformFeeBps } from "@/lib/settings";
 import { maybeSeedDemo } from "@/lib/demo-seed";
@@ -49,9 +55,12 @@ export default async function HomePage() {
           <h1 className="mt-3 font-serif text-4xl leading-tight tracking-tight sm:text-5xl">
             Avtale først.<br />Kontakt etter betaling.
           </h1>
+          <div className="mt-4">
+            <PaymentPlanBadge />
+          </div>
           <p className="mt-4 max-w-xl text-lg text-ink-soft">
             Jobbenmin er en markedsplass der kunder legger ut jobb, verifiserte bedrifter gir tilbud, og
-            partene snakker i appen. Telefon, e-post og eksakt adresse låses opp først når betalingen er
+            partene snakker i appen. Telefon, e-post og eksakt adresse låses opp først når bookingen er
             bekreftet på serveren — ikke av en suksess-side alene.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
@@ -71,24 +80,71 @@ export default async function HomePage() {
             <li>Til bedriften: {formatNok(example.providerPayoutOre)}</li>
           </ul>
           <p className="mt-4 text-xs text-ink-soft">
-            Før kortgebyr og MVA. Ingen ekte escrow — se README og ARCHITECTURE.md.
+            Før kortgebyr og MVA. Jobbenmin er ikke bank og oppbevarer ikke oppdragspengene.
           </p>
         </div>
       </section>
 
       {dbError ? <DatabaseStatus message={dbError} /> : null}
 
-      <section className="grid gap-4 md:grid-cols-3">
-        {[
-          ["1. Legg ut eller gi tilbud", "Gratis å registrere, legge ut og by. Bedrifter oppgir org.nr."],
-          ["2. Snakk i appen", "Chat uten telefon og lenker. Filteret stopper omgåelse, og du kan rette teksten."],
-          ["3. Betal, så åpnes kontakt", "Først etter webhook `payment.succeeded` vises telefon, e-post og adresse."],
-        ].map(([title, body]) => (
-          <div key={title} className="card p-5">
-            <h2 className="font-serif text-xl">{title}</h2>
-            <p className="mt-2 text-sm text-ink-soft">{body}</p>
+      <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="card space-y-4 p-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-serif text-2xl">Trygg betaling</h2>
+            <PaymentPlanBadge />
           </div>
-        ))}
+          <div>
+            <p className="text-sm font-semibold text-moss">Nå (DEMO / preview)</p>
+            <div className="mt-1 text-sm text-ink-soft">
+              <DemoNowCopy />
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-moss">Slik er det planlagt med Vipps (når avtalen er på plass)</p>
+            <div className="mt-1 text-sm text-ink-soft">
+              <PlannedVippsCustomerCopy />
+            </div>
+          </div>
+          <p className="text-xs text-ink-soft">
+            Implementert i preview: DEMO-webhook merker bookingen som betalt og låser opp kontakt. Ikke
+            implementert: ekte Vipps, refusjon, automatisk godkjenningsfrist.{" "}
+            <Link href="/avbestilling" className="font-semibold text-moss underline">
+              Avbestilling og reklamasjon
+            </Link>
+          </p>
+        </div>
+        <div className="card space-y-3 p-6">
+          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-copper">For bedrifter</p>
+          <h2 className="font-serif text-2xl">Oppgjør via Vipps (planlagt)</h2>
+          <div className="text-sm text-ink-soft">
+            <PlannedVippsProviderCopy />
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-4 font-serif text-2xl">Slik fungerer det</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          {[
+            [
+              "1. Legg ut eller gi tilbud",
+              "Gratis å registrere, legge ut og by. Bedrifter oppgir org.nr. Dere snakker i appen uten å bytte telefon.",
+            ],
+            [
+              "2. Book — reservasjon (planlagt)",
+              "Når du godtar et tilbud, reserveres beløpet i Vipps. I preview: DEMO uten ekte trekk. Kontakt låses opp når DEMO-webhook bekrefter bookingen.",
+            ],
+            [
+              "3. Godkjenn — da trekkes beløpet",
+              "Firmaet gjør jobben. Planlagt: beløpet trekkes når du godkjenner, eller etter avtalt frist. Avbestiller du før trekket, frigjøres reservasjonen.",
+            ],
+          ].map(([title, body]) => (
+            <div key={title} className="card p-5">
+              <h3 className="font-serif text-xl">{title}</h3>
+              <p className="mt-2 text-sm text-ink-soft">{body}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section>

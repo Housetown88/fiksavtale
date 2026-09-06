@@ -203,8 +203,9 @@ export function OfferForm({
         <textarea className="field min-h-28" name="message" required placeholder="Hva inngår, når kan dere starte?" />
       </label>
       <p className="text-xs text-ink-soft">
-        Ved {Math.round(feePreview.amountOre / 100)} NOK trekkes {Math.round(feePreview.feeOre / 100)} NOK i
-        plattformgebyr. Dere ser ca. {Math.round(feePreview.payoutOre / 100)} NOK før betalingsgebyr/MVA.
+        Ved {Math.round(feePreview.amountOre / 100)} NOK er plattformgebyret{" "}
+        {Math.round(feePreview.feeOre / 100)} NOK (avregnes etter avtale, typisk faktura). Planlagt: Vipps
+        reserverer kundens beløp; dere får oppgjør når kunden godkjenner. I DEMO: ingen ekte trekk.
       </p>
       <button className="btn btn-primary" disabled={pending} type="submit">
         {pending ? "Sender…" : "Send tilbud"}

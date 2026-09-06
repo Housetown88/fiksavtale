@@ -12,6 +12,8 @@ import {
 } from "@/app/actions";
 import { Alert, FeeBox, PageTitle, StatusBadge } from "@/components/ui";
 import { CancelForm, ExtraForm, ReviewForm } from "@/components/forms";
+import { CheckoutPaymentCopy, PlannedVippsProviderCopy } from "@/components/PaymentCopy";
+import { formatNok } from "@/lib/money";
 
 export default async function BookingPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -42,12 +44,29 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         />
         <div className="mt-4 space-y-3">
           {booking.status === "PENDING_PAYMENT" && user.id === booking.customerId ? (
-            <form action={startDemoPaymentAction}>
-              <input type="hidden" name="bookingId" value={booking.id} />
-              <button className="btn btn-copper" type="submit">
-                Start DEMO-betaling
-              </button>
-            </form>
+            <div className="card space-y-3 p-5">
+              <h2 className="font-serif text-xl">Bekreft booking</h2>
+              <CheckoutPaymentCopy amountLabel={formatNok(booking.amountOre)} />
+              <form action={startDemoPaymentAction}>
+                <input type="hidden" name="bookingId" value={booking.id} />
+                <button className="btn btn-copper" type="submit">
+                  Bekreft og fortsett (DEMO — ingen ekte trekk)
+                </button>
+              </form>
+            </div>
+          ) : null}
+          {user.id === booking.providerId ? (
+            <div className="card space-y-2 p-5">
+              <h2 className="font-serif text-xl">Oppgjør (planlagt)</h2>
+              <div className="text-sm text-ink-soft">
+                <PlannedVippsProviderCopy />
+              </div>
+              {booking.status === "PENDING_PAYMENT" ? (
+                <p className="text-xs text-ink-soft">
+                  I preview venter bookingen på DEMO-webhook. Ingen ekte Vipps-reservasjon er lagt.
+                </p>
+              ) : null}
+            </div>
           ) : null}
           {booking.status === "PAID" && user.id === booking.providerId ? (
             <form action={startWorkAction}>
@@ -58,12 +77,18 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
             </form>
           ) : null}
           {(booking.status === "IN_PROGRESS" || booking.status === "PAID") && user.id === booking.customerId ? (
-            <form action={completeBookingAction}>
-              <input type="hidden" name="bookingId" value={booking.id} />
-              <button className="btn btn-primary" type="submit">
-                Godkjenn ferdig arbeid
-              </button>
-            </form>
+            <div className="space-y-2">
+              <form action={completeBookingAction}>
+                <input type="hidden" name="bookingId" value={booking.id} />
+                <button className="btn btn-primary" type="submit">
+                  Godkjenn ferdig arbeid
+                </button>
+              </form>
+              <p className="text-xs text-ink-soft">
+                I DEMO er bookingen allerede merket betalt etter webhook. Planlagt med Vipps: godkjenning
+                (eller avtalt frist) utløser trekket.
+              </p>
+            </div>
           ) : null}
           <Link className="btn btn-secondary" href={`/oppdrag/${job.id}`}>
             Til oppdraget

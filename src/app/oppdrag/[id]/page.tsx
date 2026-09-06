@@ -136,11 +136,15 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                     Status: {offer.status}. Gebyr {formatNok(calcCommission(offer.amountOre, feeBps).platformFeeOre)}.
                   </p>
                   {isOwner && offer.status === "PENDING" && job.status === "OPEN" ? (
-                    <form action={acceptOfferAction} className="mt-3">
+                    <form action={acceptOfferAction} className="mt-3 space-y-2">
                       <input type="hidden" name="offerId" value={offer.id} />
                       <button className="btn btn-primary" type="submit">
-                        Godta og gå til betaling
+                        Godta og gå til booking (DEMO)
                       </button>
+                      <p className="text-xs text-ink-soft">
+                        Planlagt: Vipps-reservasjon på {formatNok(offer.amountOre)}. I preview: ingen ekte
+                        trekk.
+                      </p>
                     </form>
                   ) : null}
                 </div>

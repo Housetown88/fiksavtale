@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { formatNok } from "@/lib/money";
 import { PageTitle, StatusBadge } from "@/components/ui";
+import { PlannedVippsProviderCopy } from "@/components/PaymentCopy";
 
 export default async function OverviewPage() {
   const user = await getCurrentUser();
@@ -49,16 +50,27 @@ export default async function OverviewPage() {
       </PageTitle>
 
       {user.role === "PROVIDER" ? (
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="card p-4">
-            <p className="text-sm text-ink-soft">Forventet utbetaling (betalte jobber)</p>
-            <p className="font-serif text-3xl">{formatNok(earned)}</p>
+        <>
+          <div className="card space-y-2 p-5">
+            <h2 className="font-serif text-xl">Oppgjør (planlagt)</h2>
+            <div className="text-sm text-ink-soft">
+              <PlannedVippsProviderCopy />
+            </div>
+            <p className="text-xs text-ink-soft">
+              Tallene under er DEMO-beregninger etter webhook, ikke ekte Vipps-utbetaling.
+            </p>
           </div>
-          <div className="card p-4">
-            <p className="text-sm text-ink-soft">Plattformgebyr trukket</p>
-            <p className="font-serif text-3xl">{formatNok(fees)}</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="card p-4">
+              <p className="text-sm text-ink-soft">Forventet utbetaling (betalte jobber)</p>
+              <p className="font-serif text-3xl">{formatNok(earned)}</p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-ink-soft">Plattformgebyr trukket</p>
+              <p className="font-serif text-3xl">{formatNok(fees)}</p>
+            </div>
           </div>
-        </div>
+        </>
       ) : null}
 
       <section>

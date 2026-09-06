@@ -13,7 +13,7 @@ export function AppShell({
     <div className="flex min-h-full flex-col">
       <div className="border-b border-line bg-pine text-paper">
         <p className="mx-auto max-w-6xl px-4 py-2 text-center text-xs sm:text-sm">
-          DEMO-prototype — ikke en ekte betalings- eller verifiseringstjeneste. Ingen midler holdes i depot.
+          DEMO-prototype — ingen ekte Vipps-trekk. Jobbenmin er ikke bank og oppbevarer ikke oppdragspenger.
         </p>
       </div>
       <header className="border-b border-line/80 bg-paper-strong/80 backdrop-blur">

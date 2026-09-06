@@ -13,7 +13,10 @@ export default function TermsPage() {
         <li>Registrering, utlegging og tilbud er gratis. Gebyr tas bare av betalte jobber.</li>
         <li>Direkte kontakt og eksakt adresse låses til serverbekreftet betaling.</li>
         <li>Når kontakt først er låst opp, kan den ikke gjøres usett.</li>
-        <li>DEMO-betaling er simulert. Ekte Stripe Connect / PSD2 må avklares med advokat før produksjon.</li>
+        <li>
+          DEMO-betaling er simulert (webhook). Planlagt: Vipps reserve og capture. Jobbenmin er ikke
+          bank og oppbevarer ikke oppdragspengene. Ekte betalingsavtale må avklares før produksjon.
+        </li>
       </ul>
     </article>
   );

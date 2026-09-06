@@ -121,7 +121,9 @@ export function FeeBox({
         </div>
       </dl>
       <p className="mt-2 text-xs text-ink-soft">
-        Gebyret tas bare av betalte jobber. Kortgebyr og MVA er ikke beregnet i prototypen.
+        {audience === "customer"
+          ? "Gebyret avregnes med firmaet etter avtale. I DEMO bekreftes bookingen uten ekte trekk. Planlagt: Vipps reserverer beløpet; trekket skjer ved godkjenning eller etter frist."
+          : "Når Vipps er på plass: dere får Vipps-oppgjør når kunden godkjenner (eller etter frist). Gebyr avregnes etter avtale — typisk faktura. Kortgebyr og MVA er ikke beregnet i prototypen."}
       </p>
     </div>
   );

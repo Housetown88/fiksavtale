@@ -29,9 +29,14 @@ export default async function PaymentConfirmPage({
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <PageTitle kicker="DEMO-betaling" title="Bekreftelse venter på serveren">
-        Denne siden er bare en redirect. Den låser ikke opp kontakt alene.
+        Denne siden er bare en redirect. Den låser ikke opp kontakt alene. Vipps er ikke live.
       </PageTitle>
       <div className="card space-y-3 p-5">
+        <p className="text-sm text-ink-soft">
+          I preview bekrefter en signert DEMO-webhook bookingen. Planlagt med Vipps: reservasjon ved
+          booking, trekk først når du godkjenner jobben (eller etter frist). Jobbenmin oppbevarer ikke
+          oppdragspengene.
+        </p>
         <p>
           Bookingstatus: <StatusBadge status={booking.status} />
         </p>
