@@ -22,9 +22,9 @@ export function createPrisma(overrideUrl?: string) {
   }
 
   if (isLibsqlUrl(url)) {
-    // Lastes bare for Turso — unngå å kreve adapteren for SQLite/Neon.
+    // Lastes bare for Turso. webpackIgnore: webpack skal ikke folde inn pakken.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { PrismaLibSQL } = require("@prisma/adapter-libsql") as typeof import("@prisma/adapter-libsql");
+    const { PrismaLibSQL } = require(/* webpackIgnore: true */ "@prisma/adapter-libsql") as typeof import("@prisma/adapter-libsql");
     const adapter = new PrismaLibSQL({
       url,
       authToken: process.env.TURSO_AUTH_TOKEN ?? process.env.DATABASE_AUTH_TOKEN,
