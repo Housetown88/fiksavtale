@@ -8,9 +8,11 @@ import {
 
 export { JOB_IMAGE_TYPES, MAX_JOB_IMAGE_BYTES, MAX_JOB_IMAGES };
 
-/** Prisma Bytes er Uint8Array på Postgres-klienten. */
-export function toPrismaBytes(buffer: Buffer): Uint8Array {
-  return new Uint8Array(buffer);
+/** Prisma Bytes er Uint8Array<ArrayBuffer> på Postgres-klienten. */
+export function toPrismaBytes(buffer: Buffer): Uint8Array<ArrayBuffer> {
+  const copy = new Uint8Array(new ArrayBuffer(buffer.byteLength));
+  copy.set(buffer);
+  return copy;
 }
 
 const MAGIC = {
