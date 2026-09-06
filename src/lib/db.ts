@@ -1,10 +1,26 @@
 import { PrismaClient } from "@prisma/client";
-import { databaseUrl, isLibsqlUrl } from "./database-url";
+import {
+  canUseDatabase,
+  DatabaseUnavailableError,
+  databaseUrl,
+  isLibsqlUrl,
+} from "./database-url";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 export function createPrisma(overrideUrl?: string) {
+  if (!overrideUrl) {
+    const availability = canUseDatabase();
+    if (!availability.ok) {
+      throw new DatabaseUnavailableError(availability.message);
+    }
+  }
+
   const url = databaseUrl(overrideUrl);
+  if (!url) {
+    throw new DatabaseUnavailableError();
+  }
+
   if (isLibsqlUrl(url)) {
     // Lastes bare for Turso — unngå å kreve adapteren for SQLite/Neon.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -15,15 +31,22 @@ export function createPrisma(overrideUrl?: string) {
     });
     return new PrismaClient({ adapter });
   }
-  return new PrismaClient(
-    overrideUrl || process.env.DATABASE_URL
-      ? { datasources: { db: { url } } }
-      : undefined,
-  );
+
+  return new PrismaClient({ datasources: { db: { url } } });
 }
 
-export const db = globalForPrisma.prisma ?? createPrisma();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = db;
+function getClient(): PrismaClient {
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createPrisma();
+  }
+  return globalForPrisma.prisma;
 }
+
+/** Lazy Prisma-klient — konstrueres ikke ved import. */
+export const db = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const client = getClient();
+    const value = Reflect.get(client, prop, receiver);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});

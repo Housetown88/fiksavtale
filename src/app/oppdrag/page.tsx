@@ -1,7 +1,9 @@
 import { db } from "@/lib/db";
-import { Alert, JobCard, PageTitle } from "@/components/ui";
+import { JobCard, PageTitle } from "@/components/ui";
+import { DatabaseStatus } from "@/components/DatabaseStatus";
 import { JOB_CATEGORIES, OSLO_AREAS } from "@/lib/categories";
 import { maybeSeedDemo } from "@/lib/demo-seed";
+import { canUseDatabase } from "@/lib/database-url";
 
 export default async function JobsPage({
   searchParams,
@@ -9,26 +11,40 @@ export default async function JobsPage({
   searchParams: Promise<{ q?: string; category?: string; area?: string }>;
 }) {
   const params = await searchParams;
-  let jobs: Awaited<ReturnType<typeof db.job.findMany>> = [];
+  let jobs: {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    area: string;
+    budgetMinOre: number | null;
+    budgetMaxOre: number | null;
+    status: string;
+  }[] = [];
   let dbError: string | null = null;
-  try {
-    await maybeSeedDemo(db);
-    jobs = await db.job.findMany({
-    where: {
-      status: "OPEN",
-      category: params.category || undefined,
-      area: params.area || undefined,
-      OR: params.q
-        ? [
-            { title: { contains: params.q } },
-            { description: { contains: params.q } },
-          ]
-        : undefined,
-    },
-    orderBy: { createdAt: "desc" },
-    });
-  } catch {
-    dbError = "Kunne ikke hente oppdrag. Databasen er utilgjengelig eller ikke klargjort.";
+  const availability = canUseDatabase();
+  if (!availability.ok) {
+    dbError = availability.message;
+  } else {
+    try {
+      await maybeSeedDemo(db);
+      jobs = await db.job.findMany({
+        where: {
+          status: "OPEN",
+          category: params.category || undefined,
+          area: params.area || undefined,
+          OR: params.q
+            ? [
+                { title: { contains: params.q } },
+                { description: { contains: params.q } },
+              ]
+            : undefined,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+    } catch {
+      dbError = "Kunne ikke hente oppdrag. Databasen er utilgjengelig eller ikke klargjort.";
+    }
   }
 
   return (
@@ -36,7 +52,7 @@ export default async function JobsPage({
       <PageTitle kicker="Markedsplass" title="Åpne oppdrag">
         Område vises, men eksakt gateadresse er skjult til betalingen er bekreftet.
       </PageTitle>
-      {dbError ? <Alert tone="warn">{dbError}</Alert> : null}
+      {dbError ? <DatabaseStatus message={dbError} /> : null}
       <form className="card mb-6 grid gap-3 p-4 md:grid-cols-4" method="get">
         <input className="field" name="q" placeholder="Søk" defaultValue={params.q} />
         <select className="field" name="category" defaultValue={params.category ?? ""}>

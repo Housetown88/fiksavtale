@@ -53,9 +53,11 @@ SQLite-fil virker **ikke** på Vercel serverless. Sett en ekstern database:
 | `SEED_DEMO` | Nei (anbefalt på preview) | `1` = så DEMO-data når basen er tom. Risiko: demo-kontoer i feil miljø. |
 | `SEED_RESET` | Nei | `1` = tøm basen og så på nytt. **Farlig** mot delt/prod-database. |
 
-Etter deploy: forsiden skal laste uten 500 selv om basen er tom (da vises norsk melding). Med `SEED_DEMO=1` og ferdig `db:push` vises Oslo-oppdrag.
+Prisma-klienten opprettes **ikke** ved import. Mangler eller ugyldig `DATABASE_URL` på Vercel gir en norsk statusmelding på forsiden — ikke en hard 500.
 
-## DEMO-kontoer
+Etter deploy uten database: forsiden lastes med advarsel. Med gyldig `DATABASE_URL`, `db:push` og `SEED_DEMO=1` vises Oslo-oppdrag.
+
+**Minimum for at preview skal vise mer enn advarselen:** `DATABASE_URL` (Neon/Turso) + `SESSION_SECRET` (eller `AUTH_SECRET`) + `DEMO_WEBHOOK_SECRET`. Deretter `npm run db:push` mot den samme URL-en.
 
 ## DEMO-kontoer
 

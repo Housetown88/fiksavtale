@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import type { Role } from "@prisma/client";
 import { db } from "./db";
 import { hashSessionToken, randomToken } from "./crypto";
-import { sessionSecret } from "./database-url";
+import { canUseDatabase, sessionSecret } from "./database-url";
 
 function tokenHash(token: string): string {
   return hashSessionToken(token, sessionSecret());
@@ -55,6 +55,7 @@ export async function destroySession() {
 }
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
+  if (!canUseDatabase().ok) return null;
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
