@@ -8,6 +8,11 @@ import {
 
 export { JOB_IMAGE_TYPES, MAX_JOB_IMAGE_BYTES, MAX_JOB_IMAGES };
 
+/** Prisma Bytes er Uint8Array på Postgres-klienten. */
+export function toPrismaBytes(buffer: Buffer): Uint8Array {
+  return new Uint8Array(buffer);
+}
+
 const MAGIC = {
   jpeg: [0xff, 0xd8, 0xff],
   png: [0x89, 0x50, 0x4e, 0x47],
@@ -99,8 +104,8 @@ export async function saveJobImages(db: PrismaClient, jobId: string, files: File
         width: processed.width,
         height: processed.height,
         sizeBytes: processed.sizeBytes,
-        data: processed.data,
-        thumb: processed.thumb,
+        data: toPrismaBytes(processed.data),
+        thumb: toPrismaBytes(processed.thumb),
         sortOrder: index,
       },
     });

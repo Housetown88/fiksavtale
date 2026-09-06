@@ -11,7 +11,7 @@ import {
 } from "./domain";
 import { createPaymentIntent, handlePaymentWebhook } from "./payments";
 import { orgNumberWithChecksum } from "./orgnr";
-import { createDemoJobImage } from "./job-images";
+import { createDemoJobImage, toPrismaBytes } from "./job-images";
 
 export async function resetDemoData(db: PrismaClient) {
   await db.payment.deleteMany();
@@ -280,8 +280,8 @@ export async function ensureDemoJobImages(db: PrismaClient, jobId?: string) {
         width: demoPhotoBefore.width,
         height: demoPhotoBefore.height,
         sizeBytes: demoPhotoBefore.sizeBytes,
-        data: demoPhotoBefore.data,
-        thumb: demoPhotoBefore.thumb,
+        data: toPrismaBytes(demoPhotoBefore.data),
+        thumb: toPrismaBytes(demoPhotoBefore.thumb),
         sortOrder: 0,
       },
       {
@@ -290,8 +290,8 @@ export async function ensureDemoJobImages(db: PrismaClient, jobId?: string) {
         width: demoPhotoDetail.width,
         height: demoPhotoDetail.height,
         sizeBytes: demoPhotoDetail.sizeBytes,
-        data: demoPhotoDetail.data,
-        thumb: demoPhotoDetail.thumb,
+        data: toPrismaBytes(demoPhotoDetail.data),
+        thumb: toPrismaBytes(demoPhotoDetail.thumb),
         sortOrder: 1,
       },
     ],
