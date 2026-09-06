@@ -19,14 +19,18 @@ export function AppShell({
       </div>
       <header className="border-b border-line/80 bg-paper-strong/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <Link href="/" className="flex shrink-0 items-center">
+          <Link
+            href="/"
+            className="flex shrink-0 items-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
+          >
             <Image
               src="/brand/jobbenmin-logo.png"
               alt="Jobbenmin"
               width={157}
               height={40}
               priority
-              className="h-9 w-auto sm:h-10"
+              unoptimized
+              className="h-9 w-auto bg-transparent sm:h-10"
             />
           </Link>
           <nav className="hidden items-center gap-5 text-sm font-medium md:flex">
