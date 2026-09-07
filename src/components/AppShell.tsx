@@ -58,7 +58,7 @@ export function AppShell({
           </nav>
           <div className="flex items-center gap-2 text-sm">
             {showPostJob ? (
-              <Link href="/oppdrag/nytt" className="btn btn-copper btn-sm sm:min-h-11 sm:px-4">
+              <Link href="/oppdrag/nytt" className="btn btn-copper btn-sm hidden sm:inline-flex sm:min-h-11 sm:px-4">
                 Legg ut jobb
               </Link>
             ) : null}

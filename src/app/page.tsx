@@ -71,9 +71,14 @@ export default async function HomePage() {
             </Link>
           </div>
           <ul className="mt-6 space-y-2 text-sm text-ink-soft">
-            <li>Bedrifter med org.nr</li>
-            <li>Trygg betaling i appen</li>
-            <li>Chat og avtale før kontakt</li>
+            {["Bedrifter med org.nr", "Trygg betaling i appen", "Chat og avtale før kontakt"].map((item) => (
+              <li key={item} className="flex items-center gap-2">
+                <span className="text-moss" aria-hidden>
+                  ✓
+                </span>
+                <span>{item}</span>
+              </li>
+            ))}
           </ul>
           <p className="mt-4 text-sm text-ink-soft">Avtale først. Kontakt etter betaling.</p>
         </div>
