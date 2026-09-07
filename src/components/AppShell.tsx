@@ -21,12 +21,12 @@ export function AppShell({
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Link
             href="/"
-            className="flex shrink-0 items-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
+            className="flex shrink-0 items-center rounded-lg bg-black px-2.5 py-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
           >
             <Image
               src="/brand/jobbenmin-logo.png"
               alt="Jobbenmin"
-              width={157}
+              width={120}
               height={40}
               priority
               unoptimized
