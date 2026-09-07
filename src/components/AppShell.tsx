@@ -30,7 +30,7 @@ export function AppShell({
               height={40}
               priority
               unoptimized
-              className="h-9 w-auto bg-transparent sm:h-10"
+              className="h-10 w-auto"
             />
           </Link>
           <nav className="hidden items-center gap-5 text-sm font-medium md:flex">
