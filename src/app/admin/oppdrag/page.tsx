@@ -17,7 +17,7 @@ export default async function AdminJobsPage() {
               <p className="font-semibold">{job.title}</p>
               <p className="text-sm text-ink-soft">{job.customer.name} · {job.area}</p>
             </div>
-            <StatusBadge status={job.status} />
+            <StatusBadge status={job.status} showRaw />
           </Link>
         ))}
       </div>

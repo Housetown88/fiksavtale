@@ -50,6 +50,9 @@ export function AppShell({
                 Samtaler
               </Link>
             ) : null}
+            <Link href="/kontakt" className="nav-link">
+              Hjelp
+            </Link>
             {user?.role === "ADMIN" ? (
               <Link href="/admin" className="nav-link">
                 Admin
@@ -102,7 +105,10 @@ export function AppShell({
               Avbestilling og reklamasjon
             </Link>
             <Link href="/verifisering" className="hover:text-ink">
-              Hva merket «Org.nr sjekket» betyr
+              Hva merket «Org.nr format OK» betyr
+            </Link>
+            <Link href="/kontakt" className="hover:text-ink">
+              Kontakt / hjelp
             </Link>
           </div>
           <div className="flex flex-col gap-2">
@@ -118,19 +124,18 @@ export function AppShell({
       </footer>
       <nav className="fixed inset-x-0 bottom-0 z-20 grid border-t border-line bg-paper-strong text-center text-xs font-semibold md:hidden">
         {user ? (
-          <div className="grid grid-cols-4">
+          <div className={`grid ${showPostJob ? "grid-cols-5" : "grid-cols-4"}`}>
             <Link className="tap-target py-3" href="/oppdrag">
               Oppdrag
+            </Link>
+            <Link className="tap-target py-3" href="/oversikt">
+              {user.role === "CUSTOMER" ? "Mine jobber" : "Oversikt"}
             </Link>
             {showPostJob ? (
               <Link className="tap-target py-3 text-copper" href="/oppdrag/nytt">
                 Legg ut
               </Link>
-            ) : (
-              <Link className="tap-target py-3" href="/oversikt">
-                Oversikt
-              </Link>
-            )}
+            ) : null}
             <Link className="tap-target py-3" href="/samtaler">
               Samtaler
             </Link>

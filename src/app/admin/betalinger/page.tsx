@@ -10,16 +10,19 @@ export default async function AdminPaymentsPage() {
   return (
     <div>
       <PageTitle title="Betalinger">
-        DEMO-hendelser. Idempotensnøkkel er eventId.
+        DEMO-hendelser. Hendelses-ID (eventId) er nøkkelen som hindrer at samme bekreftelse telles to
+        ganger. Dette er teknisk detalj for admin, ikke kundetekst.
       </PageTitle>
       <div className="space-y-2">
         {payments.map((payment) => (
           <div key={payment.id} className="card p-4 text-sm">
             <div className="flex items-center justify-between">
               <p className="font-semibold">{payment.booking.job.title}</p>
-              <StatusBadge status={payment.status} />
+              <StatusBadge status={payment.status} showRaw />
             </div>
-            <p>{formatNok(payment.amountOre)} · event {payment.eventId}</p>
+            <p>
+              {formatNok(payment.amountOre)} · hendelses-ID {payment.eventId}
+            </p>
           </div>
         ))}
       </div>

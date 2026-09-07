@@ -17,7 +17,7 @@ Prototypen er en Next.js App Router-app (TypeScript) med Prisma, øktbasert innl
 | `/oversikt` | Jobber, tilbud, utbetaling |
 | `/konto`, `/firma/[id]` | Profil / offentlig bedriftsside |
 | `/admin/*` | Brukere, oppdrag, betalinger, gebyr, rapporter, revisjonslogg |
-| `/vilkar`, `/personvern`, `/avbestilling`, `/verifisering` | Utkast og forbehold |
+| `/vilkar`, `/personvern`, `/avbestilling`, `/verifisering`, `/kontakt` | Utkast, forbehold og enkel kontakt |
 | `/milepaeler`, `/befaring` | Planlagte flyter (ikke bygget) |
 
 API (samme tilgangskontroll som UI):
@@ -41,7 +41,8 @@ Kjerneentiteter i `prisma/schema.prisma` (PostgreSQL). Lokalt SQLite: `prisma/sc
 - `Booking` (pris, gebyr, `contactUnlockedAt`)
 - `PaymentIntent`, `Payment` (`eventId` unikt)
 - `Review` (kun fullførte bookinger)
-- `Report`, `AuditLog`, `PlatformSettings`, `ExtraCharge`
+- `Report` (med behandlingsnotat), `AuditLog`, `PlatformSettings`, `ExtraCharge` (foreslått → godkjent → betalt)
+- `PasswordResetToken`, `ContactMessage`
 
 Beløp lagres i **øre**.
 
@@ -62,6 +63,7 @@ OPEN job
   -> bedrift starter arbeid -> IN_PROGRESS
   -> kunde godkjenner -> COMPLETED (anmeldelse mulig)
   -> avbestilling -> CANCELLED
+  -> tillegg: PROPOSED -> APPROVED (ikke finansiert) -> DEMO-betaling -> PAID
 ```
 
 Idempotens: samme `eventId` returnerer forrige resultat uten ny booking eller endret utbetaling. Allerede betalt booking får ikke ny utbetalingsberegning.
@@ -82,3 +84,4 @@ Kontaktlås: `canViewerSeeContact` krever at viseren er part, `contactUnlockedAt
 - isolasjon av oppdrag/tilbud/meldinger
 - webhook-idempotens
 - lekkasjefilter
+- budsjettvalidering, tilleggsbetaling, gebyrforhåndsvisning og betalingsstatus-tekst

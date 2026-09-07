@@ -12,6 +12,13 @@ import {
 import { createPaymentIntent, handlePaymentWebhook } from "./payments";
 import { orgNumberWithChecksum } from "./orgnr";
 import { createDemoJobImage, toPrismaBytes } from "./job-images";
+import {
+  assertStrongAdminPassword,
+  bootstrapAdminCredentials,
+  DEMO_ADMIN_EMAIL,
+  shouldSeedDemoAdmin,
+  WEAK_DEMO_PASSWORD,
+} from "./demo-mode";
 
 export async function resetDemoData(db: PrismaClient) {
   await db.payment.deleteMany();
@@ -40,7 +47,7 @@ export async function populateDemoData(db: PrismaClient) {
     create: { id: "default", platformFeeBps: Number(process.env.PLATFORM_FEE_BPS ?? 1000) },
   });
 
-  const password = await hashPassword("Demo1234!");
+  const password = await hashPassword(WEAK_DEMO_PASSWORD);
 
   const kari = await db.user.create({
     data: {
@@ -119,14 +126,16 @@ export async function populateDemoData(db: PrismaClient) {
     },
   });
 
-  await db.user.create({
-    data: {
-      email: "admin@demo.jobbenmin.no",
-      passwordHash: password,
-      name: "Jobbenmin admin",
-      role: "ADMIN",
-    },
-  });
+  if (shouldSeedDemoAdmin()) {
+    await db.user.create({
+      data: {
+        email: DEMO_ADMIN_EMAIL,
+        passwordHash: password,
+        name: "Jobbenmin admin",
+        role: "ADMIN",
+      },
+    });
+  }
 
   const viewer = (user: { id: string; role: "CUSTOMER" | "PROVIDER" | "ADMIN" }) => user;
 
@@ -299,6 +308,29 @@ export async function ensureDemoJobImages(db: PrismaClient, jobId?: string) {
 }
 
 let seedInFlight: Promise<void> | null = null;
+
+export async function maybeBootstrapAdmin(db: PrismaClient): Promise<boolean> {
+  try {
+    const creds = bootstrapAdminCredentials();
+    if (!creds) return false;
+    const existing = await db.user.findUnique({ where: { email: creds.email } });
+    if (existing) return false;
+    assertStrongAdminPassword(creds.password);
+    await db.user.create({
+      data: {
+        email: creds.email,
+        passwordHash: await hashPassword(creds.password),
+        name: "Jobbenmin admin",
+        role: "ADMIN",
+      },
+    });
+    console.info("Opprettet bootstrap-admin fra ADMIN_BOOTSTRAP_EMAIL.");
+    return true;
+  } catch (error) {
+    console.error("ADMIN_BOOTSTRAP feilet:", error instanceof Error ? error.message : error);
+    return false;
+  }
+}
 
 export async function maybeSeedDemo(db: PrismaClient): Promise<boolean> {
   if (process.env.SEED_DEMO !== "1") return false;

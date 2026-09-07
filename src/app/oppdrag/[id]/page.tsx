@@ -8,9 +8,10 @@ import { categoryLabel } from "@/lib/categories";
 import { calcCommission } from "@/lib/money";
 import { getPlatformFeeBps } from "@/lib/settings";
 import { acceptOfferAction } from "@/app/actions";
-import { Alert, FeeBox, PageTitle, StarRating, StatusBadge, VerifiedBadge } from "@/components/ui";
+import { Alert, PageTitle, StarRating, StatusBadge, VerifiedBadge } from "@/components/ui";
 import { OfferForm, ReportForm } from "@/components/forms";
 import { JobImageGallery } from "@/components/JobImages";
+import { formatBudgetRange } from "@/lib/budget";
 import { formatNok } from "@/lib/money";
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -26,7 +27,6 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const isOwner = user?.id === job.customerId;
   const feeBps = await getPlatformFeeBps(db);
   const quoteAmount = job.budgetMaxOre ?? job.budgetMinOre ?? 500_000;
-  const quote = calcCommission(quoteAmount, feeBps);
   const offers = await db.offer.findMany({
     where: {
       jobId: job.id,
@@ -67,9 +67,16 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             Synlig område: {job.area}
             {job.postalCode ? `, ${job.postalCode}` : ""}. Eksakt adresse vises etter bekreftet betaling.
           </p>
-          {job.budgetMinOre && job.budgetMaxOre ? (
+          {job.budgetMinOre != null || job.budgetMaxOre != null ? (
             <p className="mt-2 font-semibold">
-              Budsjett: {formatNok(job.budgetMinOre)} – {formatNok(job.budgetMaxOre)}
+              Budsjett: {formatBudgetRange(job.budgetMinOre, job.budgetMaxOre, formatNok)}
+            </p>
+          ) : null}
+          {isOwner && job.status === "OPEN" ? (
+            <p className="mt-3">
+              <Link href={`/oppdrag/${job.id}/rediger`} className="text-sm font-semibold text-moss hover:underline">
+                Rediger oppdrag
+              </Link>
             </p>
           ) : null}
         </div>
@@ -136,7 +143,12 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   </div>
                   <p className="mt-2 text-sm">{offer.message}</p>
                   <p className="mt-2 text-xs text-ink-soft">
-                    Status: {offer.status}. Gebyr {formatNok(calcCommission(offer.amountOre, feeBps).platformFeeOre)}.
+                    Status: <StatusBadge status={offer.status} />. Gebyr{" "}
+                    {formatNok(calcCommission(offer.amountOre, feeBps).platformFeeOre)} avregnes typisk via
+                    faktura.
+                    {job.status === "CANCELLED" && offer.status === "ACCEPTED"
+                      ? " Tilbudet ble godtatt før bookingen ble avbestilt — det er historikk, ikke en aktiv avtale."
+                      : null}
                   </p>
                   {isOwner && offer.status === "PENDING" && job.status === "OPEN" ? (
                     <form action={acceptOfferAction} className="mt-3 space-y-2">
@@ -162,20 +174,11 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         {user?.role === "PROVIDER" && job.status === "OPEN" ? (
           <div className="card p-5">
             <h2 className="font-serif text-xl tracking-tight">Gi tilbud</h2>
-            <p className="mt-1 text-sm text-ink-soft">Kunden ser totalen. Dere ser gebyr og utbetaling før dere sender.</p>
+            <p className="mt-1 text-sm text-ink-soft">
+              Kunden ser totalen. Dere ser gebyr og illustrasjon etter faktura mens dere skriver prisen.
+            </p>
             <div className="mt-3">
-              <FeeBox
-                amountOre={quote.platformFeeOre + quote.providerPayoutOre}
-                feeOre={quote.platformFeeOre}
-                payoutOre={quote.providerPayoutOre}
-                audience="provider"
-              />
-            </div>
-            <div className="mt-3">
-              <OfferForm
-                jobId={job.id}
-                feePreview={{ amountOre: quoteAmount, feeOre: quote.platformFeeOre, payoutOre: quote.providerPayoutOre }}
-              />
+              <OfferForm jobId={job.id} feeBps={feeBps} defaultAmountOre={quoteAmount} />
             </div>
           </div>
         ) : null}

@@ -4,6 +4,8 @@ import { calcCommission } from "./money";
 import { isValidOrgNumber, normalizeOrgNumber } from "./orgnr";
 import { getPlatformFeeBps } from "./settings";
 import { AuthzError, type Viewer } from "./authz";
+import { parseBudgetRange } from "./budget";
+import { hashSessionToken, randomToken } from "./crypto";
 import bcrypt from "bcryptjs";
 
 export async function hashPassword(password: string): Promise<string> {
@@ -86,6 +88,46 @@ export async function registerUser(
   return user;
 }
 
+function jobFields(input: {
+  title: string;
+  description: string;
+  category: string;
+  area: string;
+  postalCode?: string;
+  addressLine?: string;
+  budgetMinOre?: number | null;
+  budgetMaxOre?: number | null;
+}) {
+  assertNoContactLeak(input.title);
+  assertNoContactLeak(input.description);
+  if (!input.title.trim() || !input.description.trim()) {
+    throw new Error("Tittel og beskrivelse må fylles ut.");
+  }
+  if (input.budgetMinOre != null && input.budgetMinOre < 0) {
+    throw new Error("Budsjett fra kan ikke være negativt.");
+  }
+  if (input.budgetMaxOre != null && input.budgetMaxOre < 0) {
+    throw new Error("Budsjett til kan ikke være negativt.");
+  }
+  if (
+    input.budgetMinOre != null &&
+    input.budgetMaxOre != null &&
+    input.budgetMinOre > input.budgetMaxOre
+  ) {
+    throw new Error("Budsjett fra kan ikke være høyere enn budsjett til.");
+  }
+  return {
+    title: input.title.trim(),
+    description: input.description.trim(),
+    category: input.category,
+    area: input.area.trim(),
+    postalCode: input.postalCode?.trim() || null,
+    addressLine: input.addressLine?.trim() || null,
+    budgetMinOre: input.budgetMinOre ?? null,
+    budgetMaxOre: input.budgetMaxOre ?? null,
+  };
+}
+
 export async function createJob(
   db: PrismaClient,
   viewer: Viewer,
@@ -96,31 +138,109 @@ export async function createJob(
     area: string;
     postalCode?: string;
     addressLine?: string;
-    budgetMinOre?: number;
-    budgetMaxOre?: number;
+    budgetMinOre?: number | null;
+    budgetMaxOre?: number | null;
   },
 ) {
   if (viewer.role !== "CUSTOMER" && viewer.role !== "ADMIN") {
     throw new AuthzError("Bare kunder kan legge ut oppdrag", 403);
   }
-  assertNoContactLeak(input.title);
-  assertNoContactLeak(input.description);
-  if (!input.title.trim() || !input.description.trim()) {
-    throw new Error("Tittel og beskrivelse må fylles ut.");
-  }
   return db.job.create({
     data: {
       customerId: viewer.id,
-      title: input.title.trim(),
-      description: input.description.trim(),
-      category: input.category,
-      area: input.area.trim(),
-      postalCode: input.postalCode?.trim() || null,
-      addressLine: input.addressLine?.trim() || null,
-      budgetMinOre: input.budgetMinOre ?? null,
-      budgetMaxOre: input.budgetMaxOre ?? null,
+      ...jobFields(input),
     },
   });
+}
+
+export async function updateJob(
+  db: PrismaClient,
+  viewer: Viewer,
+  jobId: string,
+  input: {
+    title: string;
+    description: string;
+    category: string;
+    area: string;
+    postalCode?: string;
+    addressLine?: string;
+    budgetMinOre?: number | null;
+    budgetMaxOre?: number | null;
+  },
+) {
+  const job = await db.job.findUnique({
+    where: { id: jobId },
+    include: { offers: true },
+  });
+  if (!job) throw new AuthzError("Oppdraget finnes ikke", 404);
+  if (job.customerId !== viewer.id && viewer.role !== "ADMIN") {
+    throw new AuthzError("Bare eieren kan redigere oppdraget", 403);
+  }
+  if (job.status !== "OPEN") {
+    throw new Error("Oppdraget kan bare redigeres så lenge det er åpent og uten valgt tilbud.");
+  }
+  return db.job.update({
+    where: { id: job.id },
+    data: jobFields(input),
+  });
+}
+
+export async function updateProfile(
+  db: PrismaClient,
+  viewer: Viewer,
+  input: {
+    name: string;
+    phone?: string;
+    area?: string;
+    addressLine?: string;
+    postalCode?: string;
+    city?: string;
+    about?: string;
+    serviceAreas?: string;
+  },
+) {
+  const name = input.name.trim();
+  if (!name) throw new Error("Navn må fylles ut.");
+  if (input.about) assertNoContactLeak(input.about);
+  await db.user.update({
+    where: { id: viewer.id },
+    data: {
+      name,
+      phone: input.phone?.trim() || null,
+    },
+  });
+  const user = await db.user.findUniqueOrThrow({
+    where: { id: viewer.id },
+    include: { customerProfile: true, providerProfile: true },
+  });
+  if (user.customerProfile) {
+    await db.customerProfile.update({
+      where: { userId: viewer.id },
+      data: {
+        area: input.area?.trim() || null,
+        addressLine: input.addressLine?.trim() || null,
+        postalCode: input.postalCode?.trim() || null,
+        city: input.city?.trim() || null,
+      },
+    });
+  }
+  if (user.providerProfile) {
+    await db.providerProfile.update({
+      where: { userId: viewer.id },
+      data: {
+        about: input.about?.trim() || null,
+        serviceAreas: input.serviceAreas?.trim() || null,
+      },
+    });
+  }
+  return db.user.findUniqueOrThrow({
+    where: { id: viewer.id },
+    include: { customerProfile: true, providerProfile: true },
+  });
+}
+
+export function parseJobBudget(form: { budgetMin?: unknown; budgetMax?: unknown }) {
+  return parseBudgetRange(form);
 }
 
 export async function createOffer(
@@ -278,7 +398,10 @@ export async function markWorkStarted(db: PrismaClient, viewer: Viewer, bookingI
 }
 
 export async function completeBooking(db: PrismaClient, viewer: Viewer, bookingId: string) {
-  const booking = await db.booking.findUnique({ where: { id: bookingId } });
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    include: { extras: true },
+  });
   if (!booking) throw new AuthzError("Bookingen finnes ikke", 404);
   if (booking.customerId !== viewer.id && viewer.role !== "ADMIN") {
     throw new AuthzError("Bare kunden kan godkjenne ferdig arbeid", 403);
@@ -286,7 +409,15 @@ export async function completeBooking(db: PrismaClient, viewer: Viewer, bookingI
   if (booking.status !== "IN_PROGRESS" && booking.status !== "PAID") {
     throw new Error("Bookingen kan ikke fullføres i denne tilstanden.");
   }
+  const unpaidApproved = booking.extras.filter((extra) => extra.status === "APPROVED");
+  if (unpaidApproved.length > 0) {
+    throw new Error("Godkjente tillegg må betales før jobben kan fullføres.");
+  }
   return db.$transaction(async (tx) => {
+    await tx.extraCharge.updateMany({
+      where: { bookingId: booking.id, status: "PROPOSED" },
+      data: { status: "REJECTED" },
+    });
     await tx.job.update({ where: { id: booking.jobId }, data: { status: "COMPLETED" } });
     return tx.booking.update({
       where: { id: booking.id },
@@ -360,6 +491,9 @@ export async function proposeExtra(
     throw new Error("Tillegg kan bare foreslås på aktive, betalte bookinger.");
   }
   assertNoContactLeak(input.title);
+  if (!Number.isFinite(input.amountOre) || input.amountOre < 10000) {
+    throw new Error("Tillegg må være minst 100 NOK.");
+  }
   return db.extraCharge.create({
     data: {
       bookingId: booking.id,
@@ -404,7 +538,7 @@ export async function cancelBooking(
   ) {
     throw new AuthzError("Du kan ikke avbestille denne bookingen", 403);
   }
-  if (["COMPLETED", "REFUNDED"].includes(booking.status)) {
+  if (["COMPLETED", "REFUNDED", "CANCELLED"].includes(booking.status)) {
     throw new Error("Bookingen kan ikke avbestilles i denne tilstanden.");
   }
   return db.$transaction(async (tx) => {
@@ -415,10 +549,50 @@ export async function cancelBooking(
     return tx.booking.update({
       where: { id: booking.id },
       data: {
-        status: booking.status === "PENDING_PAYMENT" ? "CANCELLED" : "CANCELLED",
+        status: "CANCELLED",
         cancelledAt: new Date(),
         cancelReason: reason,
       },
     });
+  });
+}
+
+export async function requestPasswordReset(db: PrismaClient, email: string) {
+  const user = await db.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+  if (!user) return { created: false as const, token: null };
+  await db.passwordResetToken.updateMany({
+    where: { userId: user.id, usedAt: null },
+    data: { usedAt: new Date() },
+  });
+  const token = randomToken();
+  await db.passwordResetToken.create({
+    data: {
+      userId: user.id,
+      tokenHash: hashSessionToken(token, process.env.SESSION_SECRET || process.env.AUTH_SECRET || "dev"),
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    },
+  });
+  return { created: true as const, token };
+}
+
+export async function resetPasswordWithToken(db: PrismaClient, token: string, password: string) {
+  if (password.length < 8) {
+    throw new Error("Passordet må ha minst 8 tegn.");
+  }
+  const tokenHash = hashSessionToken(token, process.env.SESSION_SECRET || process.env.AUTH_SECRET || "dev");
+  const row = await db.passwordResetToken.findUnique({ where: { tokenHash } });
+  if (!row || row.usedAt || row.expiresAt < new Date()) {
+    throw new Error("Lenken er ugyldig eller utløpt.");
+  }
+  await db.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: row.userId },
+      data: { passwordHash: await hashPassword(password) },
+    });
+    await tx.passwordResetToken.update({
+      where: { id: row.id },
+      data: { usedAt: new Date() },
+    });
+    await tx.session.deleteMany({ where: { userId: row.userId } });
   });
 }

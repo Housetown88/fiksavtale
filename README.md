@@ -52,6 +52,10 @@ SQLite-fil virker **ikke** på Vercel serverless. Sett en ekstern database:
 | `PLATFORM_FEE_BPS` | Nei | Standard `1000` (10 %). |
 | `SEED_DEMO` | Nei (anbefalt på preview) | `1` = så DEMO-data når basen er tom. Risiko: demo-kontoer i feil miljø. |
 | `SEED_RESET` | Nei | `1` = tøm basen og så på nytt. **Farlig** mot delt/prod-database. |
+| `ALLOW_DEMO_HINTS` / `DEMO` | Nei | `1` = vis delt DEMO-passord på /logg-inn. **Standard av i produksjon.** |
+| `ADMIN_DEMO_ALLOWED` | Nei | `1` = tillat `admin@demo` med svakt passord. **Standard av i produksjon.** |
+| `ADMIN_BOOTSTRAP_EMAIL` + `ADMIN_BOOTSTRAP_PASSWORD` | Anbefalt i prod | Oppretter én sterk admin hvis e-posten mangler. Minst 16 tegn. Ikke `Demo1234!`. |
+| `CONTACT_EMAIL` | Nei | Vises på /kontakt. |
 
 Prisma-klienten opprettes **ikke** ved import. Mangler eller fil-SQLite `DATABASE_URL` på Vercel gir en norsk statusmelding på forsiden — ikke en hard 500.
 
@@ -70,7 +74,7 @@ Da er det ofte prosjektinnstillinger, ikke appen. Sjekk **Build Logs** på deplo
 
 ## DEMO-kontoer
 
-Passord for alle: `Demo1234!`
+Delt passord (`Demo1234!`) vises **ikke** på /logg-inn i produksjon. Sett `ALLOW_DEMO_HINTS=1` bare på lokal/preview uten ekte brukere.
 
 | Rolle | E-post | Merknad |
 | --- | --- | --- |
@@ -78,20 +82,27 @@ Passord for alle: `Demo1234!`
 | Kunde | `ola@demo.jobbenmin.no` | Betalt booking (kontakt låst opp) og fullført jobb med anmeldelse |
 | Bedrift | `bjorn@nordfjell.no` | Nordfjell Elektro AS |
 | Bedrift | `silje@osloror.no` | Oslo Rør & Bad AS |
-| Admin | `admin@demo.jobbenmin.no` | Kontrollpanel og revisjonslogg |
+| Admin | `admin@demo.jobbenmin.no` | Sås/logges inn bare når `ADMIN_DEMO_ALLOWED=1` (ikke produksjon) |
+
+### Produksjon (Anders)
+
+1. **Ikke** sett `ALLOW_DEMO_HINTS`, `DEMO`, `ADMIN_DEMO_ALLOWED` eller `SEED_DEMO` mot ekte data.
+2. Sett `ADMIN_BOOTSTRAP_EMAIL` + et unikt passord (≥16 tegn) og restart, **eller** opprett admin manuelt.
+3. Hvis `admin@demo.jobbenmin.no` allerede finnes: deaktiver/slett den, eller bytt passord. Innlogging er blokkert uten `ADMIN_DEMO_ALLOWED=1`.
+4. `SEED_RESET=1` sletter hele basen — aldri mot produksjon.
 
 ## Forretningsmodell
 
 - Gratis å registrere, legge ut oppdrag og gi tilbud.
-- Plattformen tar et konfigurerbart gebyr (`platformFeeBps`, standard **1000 = 10 %**) bare av **betalte** jobber.
-- Eksempel: 5 000 NOK jobb → 500 NOK til plattformen, 4 500 NOK til bedriften.
+- Plattformen tar et konfigurerbart gebyr (standard **10 %**, 1000 basispunkter) bare av **betalte** jobber.
+- Eksempel: 5 000 NOK jobb → kunden betaler 5 000. 500 NOK er opptjent provisjon som avregnes typisk via faktura — ikke automatisk trukket fra Vipps ennå.
 
 **Antakelser (ikke regnskapssannhet):**
 
 - Beløp er inkl. avtalt fastpris, lagret i øre.
 - Kortgebyr, utbetalingsgebyr og MVA er **ikke** beregnet.
 - Plattformen holder **ikke** kundens penger i depot (ingen escrow).
-- DEMO-betalingsleverandøren simulerer `create payment intent` → webhook `payment.succeeded` → opplåsing.
+- DEMO simulerer bekreftelse → opplåsing. Vipps reserve/capture er ikke live.
 
 ## Betaling (DEMO)
 
@@ -115,14 +126,14 @@ Ekte Stripe Connect, PSD2 og utbetalingsoppsett må verifiseres med advokat og b
 
 Tekst om vilkår, personvern, avbestilling og merker er **produktutkast**, ikke juridiske fakta. Avklar GDPR, forbrukerrett, håndverkertjenester og betalingsregulering med advokat. Forretningsidentitet vises tidlig; direkte kontakt og gateadresse først etter betalt booking.
 
-Merket **«Org.nr sjekket»** betyr format + kontrollsiffer i DEMO. Det er ikke et oppslag i Brønnøysund eller faglig godkjenning.
+Merket **«Org.nr format OK»** betyr format + kontrollsiffer i DEMO. Det er ikke et oppslag i Brønnøysund eller faglig godkjenning.
 
 ## Hva som ikke er ferdig
 
 - Ekte betaling, KYC, BankID og Brønnøysund-oppslag
 - Escrow / holding av kundemidler
 - Milepælsbetaling og befaring (egne stubsider)
-- Betalingsløp for godkjente tillegg
+- Ekte Vipps merchant-integrasjon (DEMO-tillegg finnes)
 - Automatisk refusjon og tvistenemnd
 - GDPR-innsyn/sletting, e-postvarsler, chat-filvedlegg
 - OCR / visuell kontaktfiltrering av oppdragsbilder

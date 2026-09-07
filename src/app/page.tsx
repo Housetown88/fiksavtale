@@ -71,7 +71,7 @@ export default async function HomePage() {
             </Link>
           </div>
           <ul className="mt-6 space-y-2 text-sm text-ink-soft">
-            {["Bedrifter med org.nr", "Trygg betaling i appen", "Chat og avtale før kontakt"].map((item) => (
+            {["Bedrifter med org.nr", "Betaling i appen (DEMO nå)", "Chat og avtale før kontakt"].map((item) => (
               <li key={item} className="flex items-center gap-2">
                 <span className="text-moss" aria-hidden>
                   ✓

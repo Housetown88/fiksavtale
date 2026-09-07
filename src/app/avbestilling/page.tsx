@@ -29,9 +29,9 @@ export default function CancelPage() {
           opp, kan opplysningene ikke gjøres usett. Misbruk kan rapporteres.
         </li>
         <li>
-          <strong>Milepæler og tillegg:</strong> Planlagt, ikke ferdig. Ekstra arbeid skal
-          foreslås og godkjennes i appen, men godkjente tillegg er ikke koplet til et nytt
-          betalingsløp ennå.
+          <strong>Milepæler og tillegg:</strong> Milepæler er planlagt, ikke ferdig. Tillegg må
+          godkjennes og betales (DEMO) før de teller som finansiert. Godkjenning alene endrer ikke
+          jobbprisen.
         </li>
         <li>
           <strong>Hva preview faktisk gjør:</strong> DEMO-bekreftelse merker bookingen som betalt og
