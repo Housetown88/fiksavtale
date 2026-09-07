@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { formatBudgetRange } from "@/lib/budget";
 import { categoryLabel } from "@/lib/categories";
 import { formatRelativeNb, initialsFromName } from "@/lib/format";
 import { formatNok } from "@/lib/money";
+import { statusLabelNb } from "@/lib/status-labels";
 
 export function PageTitle({
   kicker,
@@ -59,32 +61,22 @@ const STATUS_TONE: Record<string, string> = {
   FAILED: "bg-danger/10 text-danger",
   SUCCEEDED: "bg-ok/10 text-ok",
   OPEN_REPORT: "bg-copper/10 text-copper-deep",
+  PROPOSED: "bg-sand text-pine",
+  APPROVED: "bg-copper/10 text-copper-deep",
+  REVIEWED: "bg-ok/10 text-ok",
+  DISMISSED: "bg-sand text-ink-soft",
+  WITHDRAWN: "bg-sand text-ink-soft",
+  EXPIRED: "bg-sand text-ink-soft",
 };
 
-export function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    OPEN: "Åpent",
-    OFFER_ACCEPTED: "Tilbud valgt",
-    BOOKED: "Booket",
-    IN_PROGRESS: "Pågår",
-    COMPLETED: "Fullført",
-    CANCELLED: "Avbrutt",
-    DISPUTED: "Tvist",
-    PENDING_PAYMENT: "Venter betaling",
-    PAID: "Betalt",
-    REFUNDED: "Refundert",
-    PENDING: "Venter",
-    ACCEPTED: "Godtatt",
-    REJECTED: "Avslått",
-    FAILED: "Feilet",
-    SUCCEEDED: "Bekreftet",
-    OPEN_REPORT: "Åpen",
-  };
+export function StatusBadge({ status, showRaw }: { status: string; showRaw?: boolean }) {
+  const label = statusLabelNb(status);
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_TONE[status] ?? "bg-sand text-pine"}`}
+      title={showRaw ? `Teknisk status: ${status}` : undefined}
     >
-      {map[status] ?? status}
+      {label}
     </span>
   );
 }
@@ -109,10 +101,7 @@ export function JobCard({
   job: JobCardData;
   showDescription?: boolean;
 }) {
-  const budget =
-    job.budgetMinOre && job.budgetMaxOre
-      ? `${formatNok(job.budgetMinOre)} – ${formatNok(job.budgetMaxOre)}`
-      : "Budsjett etter avtale";
+  const budget = formatBudgetRange(job.budgetMinOre, job.budgetMaxOre, formatNok);
 
   return (
     <Link href={`/oppdrag/${job.id}`} className="card card-link flex h-full flex-col p-5">
@@ -170,22 +159,29 @@ export function FeeBox({
       <p className="font-semibold">Prisoppsett (DEMO)</p>
       <dl className="mt-2 space-y-1">
         <div className="flex justify-between">
-          <dt>Jobbpris</dt>
+          <dt>Avtalt pris</dt>
           <dd>{formatNok(amountOre)}</dd>
         </div>
         <div className="flex justify-between">
-          <dt>Plattformgebyr</dt>
+          <dt>Plattformgebyr (10 %)</dt>
           <dd>{formatNok(feeOre)}</dd>
         </div>
-        <div className="flex justify-between font-semibold">
-          <dt>{audience === "customer" ? "Du betaler" : "Forventet utbetaling"}</dt>
-          <dd>{formatNok(audience === "customer" ? amountOre : payoutOre)}</dd>
-        </div>
+        {audience === "customer" ? (
+          <div className="flex justify-between font-semibold">
+            <dt>Du betaler</dt>
+            <dd>{formatNok(amountOre)}</dd>
+          </div>
+        ) : (
+          <div className="flex justify-between font-semibold">
+            <dt>Etter faktura (illustrasjon)</dt>
+            <dd>{formatNok(payoutOre)}</dd>
+          </div>
+        )}
       </dl>
       <p className="mt-2 text-xs text-ink-soft">
         {audience === "customer"
-          ? "Gebyret avregnes med firmaet etter avtale. I DEMO bekreftes bookingen uten ekte trekk. Planlagt: Vipps reserverer beløpet; trekket skjer ved godkjenning eller etter frist."
-          : "Når Vipps er på plass: dere får Vipps-oppgjør når kunden godkjenner (eller etter frist). Gebyr avregnes etter avtale — typisk faktura. Kortgebyr og MVA er ikke beregnet i prototypen."}
+          ? "Du betaler jobbprisen. Gebyret gjelder firmaet og avregnes typisk via faktura — det trekkes ikke automatisk i DEMO. Planlagt: Vipps reserverer beløpet; trekket skjer ved godkjenning eller etter frist."
+          : "Gebyret avregnes typisk via faktura, ikke automatisk trukket fra Vipps-oppgjør ennå. Tallet «etter faktura» er bare en illustrasjon. Kortgebyr og MVA er ikke beregnet."}
       </p>
     </div>
   );
@@ -194,14 +190,17 @@ export function FeeBox({
 export function VerifiedBadge({ checked }: { checked: boolean }) {
   if (!checked) return null;
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-moss/10 px-2 py-0.5 text-xs font-semibold text-pine">
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-moss/10 px-2 py-0.5 text-xs font-semibold text-pine"
+      title="Gyldig 9-sifret format og kontrollsiffer. Ikke Brønnøysund-oppslag."
+    >
       <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden>
         <path
           fill="currentColor"
           d="M8 1.3 9.7 2l1.9.4.4 1.9L13.7 6l-.4 1.9-.4 1.9-1.9.4L8 14.7 6.3 14l-1.9-.4-.4-1.9L2.3 10l.4-1.9.4-1.9 1.9-.4L8 1.3Zm-.2 8.7 3.2-3.3-.9-.9-2.3 2.3-1.1-1.1-.9.9 2 2.1Z"
         />
       </svg>
-      Org.nr sjekket
+      Org.nr format OK
     </span>
   );
 }

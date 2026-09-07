@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { summarizeBookingMoney } from "@/lib/booking-totals";
 import { formatNok } from "@/lib/money";
 import { PageTitle, StatusBadge } from "@/components/ui";
 import { PlannedVippsProviderCopy } from "@/components/PaymentCopy";
@@ -23,7 +24,7 @@ export default async function OverviewPage() {
         : user.role === "CUSTOMER"
           ? { customerId: user.id }
           : { providerId: user.id },
-    include: { job: true },
+    include: { job: true, extras: true },
     orderBy: { createdAt: "desc" },
   });
   const offers = user.role === "PROVIDER"
@@ -34,12 +35,15 @@ export default async function OverviewPage() {
       })
     : [];
 
-  const earned = bookings
-    .filter((booking) => ["PAID", "IN_PROGRESS", "COMPLETED"].includes(booking.status))
-    .reduce((sum, booking) => sum + booking.providerPayoutOre, 0);
-  const fees = bookings
-    .filter((booking) => ["PAID", "IN_PROGRESS", "COMPLETED"].includes(booking.status))
-    .reduce((sum, booking) => sum + booking.platformFeeOre, 0);
+  const funded = bookings.filter((booking) => ["PAID", "IN_PROGRESS", "COMPLETED"].includes(booking.status));
+  const agreed = funded.reduce((sum, booking) => {
+    const money = summarizeBookingMoney(booking.amountOre, booking.extras, booking.platformFeeBps);
+    return sum + money.fundedOre;
+  }, 0);
+  const fees = funded.reduce((sum, booking) => {
+    const money = summarizeBookingMoney(booking.amountOre, booking.extras, booking.platformFeeBps);
+    return sum + money.feeOnFundedOre;
+  }, 0);
 
   return (
     <div className="space-y-8">
@@ -62,11 +66,11 @@ export default async function OverviewPage() {
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="card p-4">
-              <p className="text-sm text-ink-soft">Forventet utbetaling (betalte jobber)</p>
-              <p className="font-serif text-3xl">{formatNok(earned)}</p>
+              <p className="text-sm text-ink-soft">Avtalt pris (betalte jobber)</p>
+              <p className="font-serif text-3xl">{formatNok(agreed)}</p>
             </div>
             <div className="card p-4">
-              <p className="text-sm text-ink-soft">Plattformgebyr trukket</p>
+              <p className="text-sm text-ink-soft">Opptjent provisjon (avregnes via faktura)</p>
               <p className="font-serif text-3xl">{formatNok(fees)}</p>
             </div>
           </div>
@@ -81,7 +85,7 @@ export default async function OverviewPage() {
               <div>
                 <p className="font-semibold">{booking.job.title}</p>
                 <p className="text-sm text-ink-soft">
-                  {formatNok(booking.amountOre)} · gebyr {formatNok(booking.platformFeeOre)}
+                  Avtalt {formatNok(booking.amountOre)} · provisjon {formatNok(booking.platformFeeOre)} (faktura)
                 </p>
               </div>
               <StatusBadge status={booking.status} />

@@ -14,9 +14,14 @@ import {
   createReview,
   decideExtra,
   markWorkStarted,
+  parseJobBudget,
   proposeExtra,
   registerUser,
+  requestPasswordReset,
+  resetPasswordWithToken,
   sendMessage,
+  updateJob,
+  updateProfile,
   verifyPassword,
 } from "@/lib/domain";
 import { errorMessage } from "@/lib/errors";
@@ -25,12 +30,22 @@ import { createPaymentIntent, handlePaymentWebhook } from "@/lib/payments";
 import { nokToOre } from "@/lib/money";
 import { AuthzError } from "@/lib/authz";
 import { collectJobImageFiles, saveJobImages } from "@/lib/job-images";
+import { LeakFilterError } from "@/lib/leak-filter";
+import { adminDemoAllowed, allowDemoHints, isDemoAdminEmail } from "@/lib/demo-mode";
 
-export type ActionState = { error?: string; ok?: boolean };
+export type ActionState = {
+  error?: string;
+  ok?: boolean;
+  highlights?: string[];
+  resetLink?: string;
+};
 
 export async function loginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const email = String(formData.get("email") ?? "").toLowerCase().trim();
   const password = String(formData.get("password") ?? "");
+  if (isDemoAdminEmail(email) && !adminDemoAllowed()) {
+    return { error: "Demokontoen for admin er slått av i dette miljøet." };
+  }
   const user = await db.user.findUnique({ where: { email } });
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     return { error: "Feil e-post eller passord." };
@@ -75,11 +90,18 @@ async function viewer() {
   return user;
 }
 
+function actionError(error: unknown): ActionState {
+  const highlights = error instanceof LeakFilterError ? error.leaks.map((leak) => leak.excerpt) : undefined;
+  return { error: errorMessage(error), highlights };
+}
+
 export async function createJobAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const user = await viewer();
-    const min = Number(formData.get("budgetMin") || 0);
-    const max = Number(formData.get("budgetMax") || 0);
+    const budget = parseJobBudget({
+      budgetMin: formData.get("budgetMin"),
+      budgetMax: formData.get("budgetMax"),
+    });
     const job = await createJob(db, user, {
       title: String(formData.get("title") ?? ""),
       description: String(formData.get("description") ?? ""),
@@ -87,8 +109,8 @@ export async function createJobAction(_prev: ActionState, formData: FormData): P
       area: String(formData.get("area") ?? ""),
       postalCode: String(formData.get("postalCode") ?? "") || undefined,
       addressLine: String(formData.get("addressLine") ?? "") || undefined,
-      budgetMinOre: min ? nokToOre(min) : undefined,
-      budgetMaxOre: max ? nokToOre(max) : undefined,
+      budgetMinOre: budget.budgetMinOre,
+      budgetMaxOre: budget.budgetMaxOre,
     });
     try {
       await saveJobImages(db, job.id, collectJobImageFiles(formData));
@@ -99,7 +121,52 @@ export async function createJobAction(_prev: ActionState, formData: FormData): P
     redirect(`/oppdrag/${job.id}`);
   } catch (error) {
     if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
-    return { error: errorMessage(error) };
+    return actionError(error);
+  }
+}
+
+export async function updateJobAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const user = await viewer();
+    const budget = parseJobBudget({
+      budgetMin: formData.get("budgetMin"),
+      budgetMax: formData.get("budgetMax"),
+    });
+    const jobId = String(formData.get("jobId") ?? "");
+    await updateJob(db, user, jobId, {
+      title: String(formData.get("title") ?? ""),
+      description: String(formData.get("description") ?? ""),
+      category: String(formData.get("category") ?? ""),
+      area: String(formData.get("area") ?? ""),
+      postalCode: String(formData.get("postalCode") ?? "") || undefined,
+      addressLine: String(formData.get("addressLine") ?? "") || undefined,
+      budgetMinOre: budget.budgetMinOre,
+      budgetMaxOre: budget.budgetMaxOre,
+    });
+    redirect(`/oppdrag/${jobId}`);
+  } catch (error) {
+    if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
+    return actionError(error);
+  }
+}
+
+export async function updateProfileAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const user = await viewer();
+    await updateProfile(db, user, {
+      name: String(formData.get("name") ?? ""),
+      phone: String(formData.get("phone") ?? "") || undefined,
+      area: String(formData.get("area") ?? "") || undefined,
+      addressLine: String(formData.get("addressLine") ?? "") || undefined,
+      postalCode: String(formData.get("postalCode") ?? "") || undefined,
+      city: String(formData.get("city") ?? "") || undefined,
+      about: String(formData.get("about") ?? "") || undefined,
+      serviceAreas: String(formData.get("serviceAreas") ?? "") || undefined,
+    });
+    revalidatePath("/konto");
+    return { ok: true };
+  } catch (error) {
+    return actionError(error);
   }
 }
 
@@ -116,7 +183,7 @@ export async function createOfferAction(_prev: ActionState, formData: FormData):
     redirect(`/samtaler/${conversation.id}`);
   } catch (error) {
     if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
-    return { error: errorMessage(error) };
+    return actionError(error);
   }
 }
 
@@ -131,7 +198,7 @@ export async function sendMessageAction(_prev: ActionState, formData: FormData):
     revalidatePath(`/samtaler/${conversationId}`);
     return { ok: true };
   } catch (error) {
-    return { error: errorMessage(error) };
+    return actionError(error);
   }
 }
 
@@ -165,7 +232,7 @@ export async function cancelBookingAction(_prev: ActionState, formData: FormData
     redirect(`/booking/${booking.id}`);
   } catch (error) {
     if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
-    return { error: errorMessage(error) };
+    return actionError(error);
   }
 }
 
@@ -181,7 +248,7 @@ export async function reviewAction(_prev: ActionState, formData: FormData): Prom
     revalidatePath(`/booking/${bookingId}`);
     return { ok: true };
   } catch (error) {
-    return { error: errorMessage(error) };
+    return actionError(error);
   }
 }
 
@@ -197,7 +264,7 @@ export async function reportAction(_prev: ActionState, formData: FormData): Prom
     revalidatePath("/admin/rapporter");
     return { ok: true };
   } catch (error) {
-    return { error: errorMessage(error) };
+    return actionError(error);
   }
 }
 
@@ -213,7 +280,7 @@ export async function extraAction(_prev: ActionState, formData: FormData): Promi
     revalidatePath(`/booking/${bookingId}`);
     return { ok: true };
   } catch (error) {
-    return { error: errorMessage(error) };
+    return actionError(error);
   }
 }
 
@@ -231,12 +298,14 @@ export async function decideExtraAction(formData: FormData) {
 export async function startDemoPaymentAction(formData: FormData) {
   const user = await viewer();
   const bookingId = String(formData.get("bookingId") ?? "");
+  const extraChargeId = String(formData.get("extraChargeId") ?? "") || undefined;
   const booking = await db.booking.findUnique({ where: { id: bookingId } });
   if (!booking || (booking.customerId !== user.id && user.role !== "ADMIN")) {
     throw new AuthzError("Bare kunden kan starte betaling", 403);
   }
-  const intent = await createPaymentIntent(db, bookingId);
-  redirect(`/booking/${bookingId}/bekreftelse?intent=${intent.id}`);
+  const intent = await createPaymentIntent(db, bookingId, extraChargeId ? { extraChargeId } : undefined);
+  const extraQuery = extraChargeId ? `&extra=${extraChargeId}` : "";
+  redirect(`/booking/${bookingId}/bekreftelse?intent=${intent.id}${extraQuery}`);
 }
 
 export async function simulateWebhookAction(formData: FormData) {
@@ -254,13 +323,15 @@ export async function simulateWebhookAction(formData: FormData) {
       : outcome === "cancelled"
         ? "payment.cancelled"
         : "payment.succeeded";
+  const extraChargeId = String(formData.get("extraChargeId") ?? "") || undefined;
   await handlePaymentWebhook(db, {
     eventId: `demo_${intentId}_${type}_${Date.now()}`,
     type,
     paymentIntentId: intentId,
     bookingId,
   });
-  redirect(`/booking/${bookingId}/bekreftelse?intent=${intentId}`);
+  const extraQuery = extraChargeId ? `&extra=${extraChargeId}` : "";
+  redirect(`/booking/${bookingId}/bekreftelse?intent=${intentId}${extraQuery}`);
 }
 
 export async function adminUpdateFeeAction(formData: FormData) {
@@ -276,7 +347,7 @@ export async function adminUpdateFeeAction(formData: FormData) {
     action: "UPDATE_FEE",
     targetType: "PlatformSettings",
     targetId: "default",
-    details: `Ny sats: ${platformFeeBps} bps`,
+    details: `Ny sats: ${platformFeeBps} basispunkter (bps)`,
   });
   redirect("/admin/gebyr");
 }
@@ -305,13 +376,59 @@ export async function adminReviewReportAction(formData: FormData) {
   if (user.role !== "ADMIN") throw new AuthzError("Kun admin", 403);
   const reportId = String(formData.get("reportId") ?? "");
   const status = String(formData.get("status") ?? "REVIEWED") === "DISMISSED" ? "DISMISSED" : "REVIEWED";
-  await db.report.update({ where: { id: reportId }, data: { status } });
+  const treatmentNote = String(formData.get("treatmentNote") ?? "").trim() || null;
+  await db.report.update({ where: { id: reportId }, data: { status, treatmentNote } });
   await writeAuditLog(db, {
     actorId: user.id,
     action: "REVIEW_REPORT",
     targetType: "Report",
     targetId: reportId,
-    details: status,
+    details: `${status}${treatmentNote ? ` — ${treatmentNote}` : ""}`,
   });
   redirect("/admin/rapporter");
+}
+
+export async function requestPasswordResetAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    const email = String(formData.get("email") ?? "").toLowerCase().trim();
+    if (!email) return { error: "Oppgi e-postadressen din." };
+    const result = await requestPasswordReset(db, email);
+    if (allowDemoHints() && result.token) {
+      return { ok: true, resetLink: `/tilbakestill-passord?token=${result.token}` };
+    }
+    return { ok: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function resetPasswordAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await resetPasswordWithToken(
+      db,
+      String(formData.get("token") ?? ""),
+      String(formData.get("password") ?? ""),
+    );
+    return { ok: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function contactAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const name = String(formData.get("name") ?? "").trim();
+    const email = String(formData.get("email") ?? "").trim();
+    const message = String(formData.get("message") ?? "").trim();
+    if (!name || !email || !message) {
+      return { error: "Navn, e-post og melding må fylles ut." };
+    }
+    await db.contactMessage.create({ data: { name, email, message } });
+    return { ok: true };
+  } catch (error) {
+    return actionError(error);
+  }
 }

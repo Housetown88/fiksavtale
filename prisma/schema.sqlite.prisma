@@ -90,6 +90,7 @@ model User {
   reportsFiled    Report[] @relation("ReportsFiled")
   reportsAbout    Report[] @relation("ReportsAbout")
   auditLogs       AuditLog[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Session {
@@ -248,11 +249,13 @@ model Payment {
 }
 
 model PaymentIntent {
-  id        String        @id @default(cuid())
-  bookingId String
-  amountOre Int
-  status    PaymentStatus @default(PENDING)
-  createdAt DateTime      @default(now())
+  id            String        @id @default(cuid())
+  bookingId     String
+  extraChargeId String?
+  extraCharge   ExtraCharge?  @relation(fields: [extraChargeId], references: [id])
+  amountOre     Int
+  status        PaymentStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
 }
 
 model ExtraCharge {
@@ -263,6 +266,7 @@ model ExtraCharge {
   amountOre   Int
   status      ExtraStatus @default(PROPOSED)
   createdAt   DateTime    @default(now())
+  paymentIntents PaymentIntent[]
 }
 
 model Review {
@@ -286,10 +290,29 @@ model Report {
   targetUser   User?        @relation("ReportsAbout", fields: [targetUserId], references: [id])
   targetJobId  String?
   targetJob    Job?         @relation(fields: [targetJobId], references: [id])
-  reason       String
-  details      String?
-  status       ReportStatus @default(OPEN)
-  createdAt    DateTime     @default(now())
+  reason        String
+  details       String?
+  treatmentNote String?
+  status        ReportStatus @default(OPEN)
+  createdAt     DateTime     @default(now())
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  message   String
+  createdAt DateTime @default(now())
 }
 
 model AuditLog {

@@ -69,22 +69,37 @@ export default async function JobsPage({
       </PageTitle>
       {dbError ? <DatabaseStatus message={dbError} /> : null}
       <form className="card mb-6 grid gap-3 p-4 md:grid-cols-4" method="get">
-        <input className="field" name="q" placeholder="Søk" defaultValue={params.q} />
-        <select className="field" name="category" defaultValue={params.category ?? ""}>
-          <option value="">Alle fag</option>
-          {JOB_CATEGORIES.map((item) => (
-            <option key={item.slug} value={item.slug}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-        <select className="field" name="area" defaultValue={params.area ?? ""}>
-          <option value="">Hele Oslo</option>
-          {OSLO_AREAS.map((area) => (
-            <option key={area}>{area}</option>
-          ))}
-        </select>
-        <button className="btn btn-primary" type="submit">
+        <label className="grid gap-1">
+          <span className="label" htmlFor="job-search">
+            Søk
+          </span>
+          <input className="field" id="job-search" name="q" placeholder="Søk" defaultValue={params.q} />
+        </label>
+        <label className="grid gap-1">
+          <span className="label" htmlFor="job-category-filter">
+            Fag
+          </span>
+          <select className="field" id="job-category-filter" name="category" defaultValue={params.category ?? ""}>
+            <option value="">Alle fag</option>
+            {JOB_CATEGORIES.map((item) => (
+              <option key={item.slug} value={item.slug}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1">
+          <span className="label" htmlFor="job-area-filter">
+            Område
+          </span>
+          <select className="field" id="job-area-filter" name="area" defaultValue={params.area ?? ""}>
+            <option value="">Hele Oslo</option>
+            {OSLO_AREAS.map((area) => (
+              <option key={area}>{area}</option>
+            ))}
+          </select>
+        </label>
+        <button className="btn btn-primary self-end" type="submit">
           Filtrer
         </button>
       </form>

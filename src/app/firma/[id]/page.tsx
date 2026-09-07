@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { db } from "@/lib/db";
 import { InitialsAvatar, StarRating, VerifiedBadge } from "@/components/ui";
 import { ReportForm } from "@/components/forms";
@@ -16,7 +15,7 @@ export default async function ProviderPage({ params }: { params: Promise<{ id: s
     }),
     db.booking.findMany({
       where: { providerId: id, status: "COMPLETED" },
-      include: { job: { select: { id: true, title: true, category: true, area: true } } },
+      include: { job: { select: { id: true, category: true, area: true } } },
       orderBy: { completedAt: "desc" },
     }),
   ]);
@@ -83,11 +82,18 @@ export default async function ProviderPage({ params }: { params: Promise<{ id: s
         <section className="space-y-3">
           <h2 className="font-serif text-2xl tracking-tight">Fullførte jobber</h2>
           {completed.map((booking) => (
-            <Link key={booking.id} href={`/oppdrag/${booking.job.id}`} className="card card-link p-4">
+            <div key={booking.id} className="card p-4">
               <p className="text-sm font-semibold text-moss">{categoryLabel(booking.job.category)}</p>
-              <p className="mt-1 font-semibold">{booking.job.title}</p>
-              <p className="text-sm text-ink-soft">{booking.job.area}</p>
-            </Link>
+              <p className="mt-1 text-sm text-ink-soft">
+                {booking.job.area}
+                {booking.completedAt
+                  ? ` · ${booking.completedAt.toLocaleDateString("nb-NO", { month: "long", year: "numeric" })}`
+                  : null}
+              </p>
+              <p className="mt-1 text-xs text-ink-soft">
+                Offentlig referanse — tittel, adresse og chat er private.
+              </p>
+            </div>
           ))}
         </section>
       ) : null}

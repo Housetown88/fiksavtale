@@ -4,20 +4,22 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { getBookingForViewer } from "@/lib/authz";
 import { getContactPayload } from "@/lib/contact";
-import { simulateWebhookAction } from "@/app/actions";
+import { simulateWebhookAction, startDemoPaymentAction } from "@/app/actions";
 import { Alert, PageTitle, StatusBadge } from "@/components/ui";
+import { paymentConfirmView } from "@/lib/payment-status-ui";
+import { formatNok } from "@/lib/money";
 
 export default async function PaymentConfirmPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ intent?: string }>;
+  searchParams: Promise<{ intent?: string; extra?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) notFound();
   const { id } = await params;
-  const { intent } = await searchParams;
+  const { intent, extra } = await searchParams;
   let booking;
   try {
     booking = await getBookingForViewer(db, user, id);
@@ -25,40 +27,61 @@ export default async function PaymentConfirmPage({
     notFound();
   }
   const contact = await getContactPayload(db, { viewerId: user.id, jobId: booking.jobId });
+  const paymentIntent = intent
+    ? await db.paymentIntent.findUnique({ where: { id: intent } })
+    : null;
+  const extraCharge = extra
+    ? await db.extraCharge.findUnique({ where: { id: extra } })
+    : paymentIntent?.extraChargeId
+      ? await db.extraCharge.findUnique({ where: { id: paymentIntent.extraChargeId } })
+      : null;
+  const view = paymentConfirmView({
+    bookingStatus: booking.status,
+    intentStatus: paymentIntent?.status ?? null,
+    contactUnlocked: contact.unlocked,
+    extraCharge: Boolean(extraCharge),
+  });
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
-      <PageTitle kicker="DEMO-betaling" title="Betalingen er ikke ferdig ennå">
-        Denne siden alene åpner ikke kontakt. Vipps er ikke live.
+      <PageTitle kicker="DEMO-betaling" title={view.title}>
+        {view.body}
       </PageTitle>
       <div className="card space-y-3 p-5">
-        <p className="text-sm text-ink-soft">
-          I preview må DEMO-bekreftelsen under kjøres for at bookingen skal merkes som betalt.
-          Planlagt med Vipps: reservasjon ved booking, trekk først når du godkjenner jobben (eller
-          etter frist). Jobbenmin oppbevarer ikke oppdragspengene.
-        </p>
         <p>
           Bookingstatus: <StatusBadge status={booking.status} />
         </p>
-        <p className="text-sm">
-          Betalingsintensjon: <code>{intent ?? "mangler"}</code>
-        </p>
-        {contact.unlocked ? (
-          <Alert tone="ok">Webhook er mottatt. Kontakt er nå tilgjengelig for partene.</Alert>
+        {paymentIntent ? (
+          <p>
+            DEMO-bekreftelse: <StatusBadge status={paymentIntent.status} /> · {formatNok(paymentIntent.amountOre)}
+          </p>
         ) : (
-          <Alert tone="warn">
-            Kontakt er fortsatt låst. Bruk DEMO-knappene under for å simulere vellykket, feilet eller
-            avbrutt betaling.
-          </Alert>
+          <p className="text-sm text-ink-soft">Ingen betalingsøkt er valgt.</p>
         )}
-        {intent && booking.status === "PENDING_PAYMENT" ? (
+        {extraCharge ? (
+          <p className="text-sm">
+            Tillegg: {extraCharge.title} — <StatusBadge status={extraCharge.status} />
+          </p>
+        ) : null}
+        {view.tone === "ok" ? (
+          <Alert tone="ok">
+            {extraCharge
+              ? "Tillegget er merket som betalt i DEMO."
+              : contact.unlocked
+                ? "Kontakt er nå tilgjengelig for partene."
+                : "Betalingen er bekreftet."}
+          </Alert>
+        ) : (
+          <Alert tone={view.tone === "warn" ? "warn" : "info"}>{view.body}</Alert>
+        )}
+        {view.showSimulate && intent && booking.status === "PENDING_PAYMENT" && !extraCharge ? (
           <div className="flex flex-wrap gap-2">
             <form action={simulateWebhookAction}>
               <input type="hidden" name="bookingId" value={booking.id} />
               <input type="hidden" name="intentId" value={intent} />
               <input type="hidden" name="outcome" value="succeeded" />
               <button className="btn btn-primary" type="submit">
-                Send payment.succeeded
+                Bekreft DEMO-betaling
               </button>
             </form>
             <form action={simulateWebhookAction}>
@@ -66,7 +89,7 @@ export default async function PaymentConfirmPage({
               <input type="hidden" name="intentId" value={intent} />
               <input type="hidden" name="outcome" value="failed" />
               <button className="btn btn-secondary" type="submit">
-                Send payment.failed
+                Simuler feilet
               </button>
             </form>
             <form action={simulateWebhookAction}>
@@ -74,11 +97,46 @@ export default async function PaymentConfirmPage({
               <input type="hidden" name="intentId" value={intent} />
               <input type="hidden" name="outcome" value="cancelled" />
               <button className="btn btn-secondary" type="submit">
-                Send payment.cancelled
+                Simuler avbrutt
               </button>
             </form>
           </div>
         ) : null}
+        {view.showSimulate && intent && extraCharge && extraCharge.status === "APPROVED" ? (
+          <div className="flex flex-wrap gap-2">
+            <form action={simulateWebhookAction}>
+              <input type="hidden" name="bookingId" value={booking.id} />
+              <input type="hidden" name="intentId" value={intent} />
+              <input type="hidden" name="extraChargeId" value={extraCharge.id} />
+              <input type="hidden" name="outcome" value="succeeded" />
+              <button className="btn btn-primary" type="submit">
+                Bekreft DEMO-tillegg
+              </button>
+            </form>
+            <form action={simulateWebhookAction}>
+              <input type="hidden" name="bookingId" value={booking.id} />
+              <input type="hidden" name="intentId" value={intent} />
+              <input type="hidden" name="extraChargeId" value={extraCharge.id} />
+              <input type="hidden" name="outcome" value="failed" />
+              <button className="btn btn-secondary" type="submit">
+                Simuler feilet
+              </button>
+            </form>
+          </div>
+        ) : null}
+        {view.showRetry ? (
+          <form action={startDemoPaymentAction}>
+            <input type="hidden" name="bookingId" value={booking.id} />
+            {extraCharge ? <input type="hidden" name="extraChargeId" value={extraCharge.id} /> : null}
+            <button className="btn btn-copper" type="submit">
+              Prøv igjen (DEMO)
+            </button>
+          </form>
+        ) : null}
+        <p className="text-xs text-ink-soft">
+          Admin ser tekniske koder. For deg: bekreftet, feilet eller avbrutt. Ingen webhook-ord i
+          kundeteksten.
+        </p>
         <Link href={`/booking/${booking.id}`} className="btn btn-secondary">
           Til bookingen
         </Link>

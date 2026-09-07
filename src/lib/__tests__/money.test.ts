@@ -8,4 +8,12 @@ describe("gebyrregning", () => {
     expect(result.providerPayoutOre).toBe(450_000);
     expect(formatNok(500_000)).toContain("5");
   });
+
+  it("oppdaterer forhåndsvisning fra redigert pris", () => {
+    const first = calcCommission(150_000, 1000);
+    const edited = calcCommission(200_000, 1000);
+    expect(first.platformFeeOre).toBe(15_000);
+    expect(edited.platformFeeOre).toBe(20_000);
+    expect(edited.providerPayoutOre).toBe(180_000);
+  });
 });

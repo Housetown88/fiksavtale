@@ -1,28 +1,59 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   cancelBookingAction,
+  contactAction,
   createJobAction,
   createOfferAction,
   extraAction,
   loginAction,
   registerAction,
   reportAction,
+  requestPasswordResetAction,
+  resetPasswordAction,
   reviewAction,
   sendMessageAction,
+  updateJobAction,
+  updateProfileAction,
   type ActionState,
 } from "@/app/actions";
 import { JOB_CATEGORIES, OSLO_AREAS } from "@/lib/categories";
+import { calcCommission, nokToOre } from "@/lib/money";
 import { JobImagePicker } from "./JobImages";
-import { Alert } from "./ui";
+import { Alert, FeeBox } from "./ui";
 
 function ErrorBox({ state }: { state: ActionState }) {
   if (!state?.error) return null;
   return (
     <Alert tone="warn">
       {state.error}
+      {state.highlights?.length ? (
+        <p className="mt-2 text-xs">
+          Marker denne teksten: {state.highlights.map((item) => `«${item}»`).join(", ")}
+        </p>
+      ) : null}
     </Alert>
+  );
+}
+
+function Field({
+  id,
+  label,
+  children,
+}: {
+  id: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="label" htmlFor={id}>
+        {label}
+      </label>
+      {children}
+    </div>
   );
 }
 
@@ -31,16 +62,79 @@ export function LoginForm() {
   return (
     <form action={action} className="grid gap-3">
       <ErrorBox state={state} />
-      <label>
-        <span className="label">E-post</span>
-        <input className="field" name="email" type="email" required autoComplete="email" />
-      </label>
-      <label>
-        <span className="label">Passord</span>
-        <input className="field" name="password" type="password" required autoComplete="current-password" />
-      </label>
+      <Field id="login-email" label="E-post">
+        <input className="field" id="login-email" name="email" type="email" required autoComplete="email" />
+      </Field>
+      <Field id="login-password" label="Passord">
+        <input
+          className="field"
+          id="login-password"
+          name="password"
+          type="password"
+          required
+          autoComplete="current-password"
+        />
+      </Field>
       <button className="btn btn-primary" disabled={pending} type="submit">
         {pending ? "Logger inn…" : "Logg inn"}
+      </button>
+      <p className="text-sm">
+        <Link href="/glemt-passord" className="font-semibold text-moss hover:underline">
+          Glemt passord?
+        </Link>
+      </p>
+    </form>
+  );
+}
+
+export function ForgotPasswordForm() {
+  const [state, action, pending] = useActionState(requestPasswordResetAction, {});
+  return (
+    <form action={action} className="grid gap-3">
+      <ErrorBox state={state} />
+      {state?.ok ? (
+        <Alert tone="ok">
+          Hvis kontoen finnes, kan passordet tilbakestilles. E-postutsendelse er ikke satt opp ennå — bruk
+          kontaktskjemaet, eller be eier om hjelp.
+          {state.resetLink ? (
+            <p className="mt-2">
+              DEMO-lenke:{" "}
+              <Link href={state.resetLink} className="font-semibold underline">
+                Tilbakestill passord
+              </Link>
+            </p>
+          ) : null}
+        </Alert>
+      ) : null}
+      <Field id="reset-email" label="E-post">
+        <input className="field" id="reset-email" name="email" type="email" required autoComplete="email" />
+      </Field>
+      <button className="btn btn-primary" disabled={pending} type="submit">
+        {pending ? "Sender…" : "Be om tilbakestilling"}
+      </button>
+    </form>
+  );
+}
+
+export function ResetPasswordForm({ token }: { token: string }) {
+  const [state, action, pending] = useActionState(resetPasswordAction, {});
+  return (
+    <form action={action} className="grid gap-3">
+      <input type="hidden" name="token" value={token} />
+      <ErrorBox state={state} />
+      {state?.ok ? (
+        <Alert tone="ok">
+          Passordet er oppdatert.{" "}
+          <Link href="/logg-inn" className="font-semibold underline">
+            Logg inn
+          </Link>
+        </Alert>
+      ) : null}
+      <Field id="new-password" label="Nytt passord (minst 8 tegn)">
+        <input className="field" id="new-password" name="password" type="password" minLength={8} required />
+      </Field>
+      <button className="btn btn-primary" disabled={pending || state?.ok} type="submit">
+        {pending ? "Lagrer…" : "Lagre nytt passord"}
       </button>
     </form>
   );
@@ -48,73 +142,75 @@ export function LoginForm() {
 
 export function RegisterForm() {
   const [state, action, pending] = useActionState(registerAction, {});
+  const [role, setRole] = useState("CUSTOMER");
+  const isFirm = role === "PROVIDER";
   return (
     <form action={action} className="grid gap-3">
       <ErrorBox state={state} />
-      <label>
-        <span className="label">Jeg er</span>
-        <select className="field" name="role" defaultValue="CUSTOMER">
+      <Field id="register-role" label="Jeg er">
+        <select
+          className="field"
+          id="register-role"
+          name="role"
+          value={role}
+          onChange={(event) => setRole(event.target.value)}
+        >
           <option value="CUSTOMER">Privatkunde</option>
           <option value="PROVIDER">Bedrift (krever org.nr)</option>
         </select>
-      </label>
-      <label>
-        <span className="label">Navn</span>
-        <input className="field" name="name" required />
-      </label>
-      <label>
-        <span className="label">E-post</span>
-        <input className="field" name="email" type="email" required />
-      </label>
-      <label>
-        <span className="label">Passord (minst 8 tegn)</span>
-        <input className="field" name="password" type="password" minLength={8} required />
-      </label>
-      <label>
-        <span className="label">Telefon (lagres, vises først etter betaling)</span>
-        <input className="field" name="phone" />
-      </label>
-      <label>
-        <span className="label">Område</span>
-        <select className="field" name="area" defaultValue="Grünerløkka">
-          {OSLO_AREAS.map((area) => (
-            <option key={area}>{area}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        <span className="label">Gateadresse (ikke synlig før betalt booking)</span>
-        <input className="field" name="addressLine" />
-      </label>
-      <div className="grid grid-cols-2 gap-3">
-        <label>
-          <span className="label">Postnr</span>
-          <input className="field" name="postalCode" />
-        </label>
-        <label>
-          <span className="label">Sted</span>
-          <input className="field" name="city" defaultValue="Oslo" />
-        </label>
-      </div>
-      <div className="card p-4">
-        <p className="font-semibold">For bedrift</p>
-        <label className="mt-2 block">
-          <span className="label">Firmanavn</span>
-          <input className="field" name="companyName" />
-        </label>
-        <label className="mt-2 block">
-          <span className="label">Organisasjonsnummer (9 siffer)</span>
-          <input className="field" name="orgNumber" />
-        </label>
-        <label className="mt-2 block">
-          <span className="label">Kort om firmaet</span>
-          <textarea className="field min-h-24" name="about" />
-        </label>
-        <label className="mt-2 block">
-          <span className="label">Områder dere dekker</span>
-          <input className="field" name="serviceAreas" />
-        </label>
-      </div>
+      </Field>
+      <Field id="register-name" label="Navn">
+        <input className="field" id="register-name" name="name" required />
+      </Field>
+      <Field id="register-email" label="E-post">
+        <input className="field" id="register-email" name="email" type="email" required />
+      </Field>
+      <Field id="register-password" label="Passord (minst 8 tegn)">
+        <input className="field" id="register-password" name="password" type="password" minLength={8} required />
+      </Field>
+      <Field id="register-phone" label="Telefon (lagres, vises først etter betaling)">
+        <input className="field" id="register-phone" name="phone" />
+      </Field>
+      {!isFirm ? (
+        <>
+          <Field id="register-area" label="Område">
+            <select className="field" id="register-area" name="area" defaultValue="Grünerløkka">
+              {OSLO_AREAS.map((area) => (
+                <option key={area}>{area}</option>
+              ))}
+            </select>
+          </Field>
+          <Field id="register-address" label="Gateadresse (ikke synlig før betalt booking)">
+            <input className="field" id="register-address" name="addressLine" />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field id="register-postal" label="Postnr">
+              <input className="field" id="register-postal" name="postalCode" />
+            </Field>
+            <Field id="register-city" label="Sted">
+              <input className="field" id="register-city" name="city" defaultValue="Oslo" />
+            </Field>
+          </div>
+        </>
+      ) : (
+        <div className="card p-4">
+          <p className="font-semibold">For bedrift</p>
+          <div className="mt-2 grid gap-3">
+            <Field id="register-company" label="Firmanavn">
+              <input className="field" id="register-company" name="companyName" required={isFirm} />
+            </Field>
+            <Field id="register-org" label="Organisasjonsnummer (9 siffer)">
+              <input className="field" id="register-org" name="orgNumber" required={isFirm} />
+            </Field>
+            <Field id="register-about" label="Kort om firmaet">
+              <textarea className="field min-h-24" id="register-about" name="about" />
+            </Field>
+            <Field id="register-service-areas" label="Områder dere dekker">
+              <input className="field" id="register-service-areas" name="serviceAreas" />
+            </Field>
+          </div>
+        </div>
+      )}
       <button className="btn btn-primary" disabled={pending} type="submit">
         {pending ? "Oppretter…" : "Opprett konto"}
       </button>
@@ -122,61 +218,119 @@ export function RegisterForm() {
   );
 }
 
-export function JobForm() {
-  const [state, action, pending] = useActionState(createJobAction, {});
+type JobFormValues = {
+  title?: string;
+  description?: string;
+  category?: string;
+  area?: string;
+  addressLine?: string;
+  postalCode?: string;
+  budgetMin?: string;
+  budgetMax?: string;
+};
+
+export function JobForm({
+  jobId,
+  initial,
+}: {
+  jobId?: string;
+  initial?: JobFormValues;
+}) {
+  const [state, action, pending] = useActionState(jobId ? updateJobAction : createJobAction, {});
+  const [values, setValues] = useState<JobFormValues>({
+    title: initial?.title ?? "",
+    description: initial?.description ?? "",
+    category: initial?.category ?? "elektriker",
+    area: initial?.area ?? "Grünerløkka",
+    addressLine: initial?.addressLine ?? "",
+    postalCode: initial?.postalCode ?? "",
+    budgetMin: initial?.budgetMin ?? "",
+    budgetMax: initial?.budgetMax ?? "",
+  });
+  const set =
+    (key: keyof JobFormValues) =>
+    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+      setValues((current) => ({ ...current, [key]: event.target.value }));
+
   return (
     <form action={action} className="grid gap-3">
+      {jobId ? <input type="hidden" name="jobId" value={jobId} /> : null}
       <ErrorBox state={state} />
-      <label>
-        <span className="label">Tittel</span>
-        <input className="field" name="title" required placeholder="F.eks. Bytte kran på kjøkken" />
-      </label>
-      <label>
-        <span className="label">Beskrivelse</span>
-        <textarea className="field min-h-32" name="description" required />
-      </label>
-      <label>
-        <span className="label">Kategori</span>
-        <select className="field" name="category" defaultValue="elektriker">
+      <Field id="job-title" label="Tittel">
+        <input
+          className="field"
+          id="job-title"
+          name="title"
+          required
+          placeholder="F.eks. Bytte kran på kjøkken"
+          value={values.title}
+          onChange={set("title")}
+        />
+      </Field>
+      <Field id="job-description" label="Beskrivelse">
+        <textarea
+          className="field min-h-32"
+          id="job-description"
+          name="description"
+          required
+          value={values.description}
+          onChange={set("description")}
+        />
+      </Field>
+      <Field id="job-category" label="Kategori">
+        <select className="field" id="job-category" name="category" value={values.category} onChange={set("category")}>
           {JOB_CATEGORIES.map((item) => (
             <option key={item.slug} value={item.slug}>
               {item.label}
             </option>
           ))}
         </select>
-      </label>
-      <label>
-        <span className="label">Område (synlig)</span>
-        <select className="field" name="area" defaultValue="Grünerløkka">
+      </Field>
+      <Field id="job-area" label="Område (synlig)">
+        <select className="field" id="job-area" name="area" value={values.area} onChange={set("area")}>
           {OSLO_AREAS.map((area) => (
             <option key={area}>{area}</option>
           ))}
         </select>
-      </label>
-      <label>
-        <span className="label">Eksakt adresse (låst til betalt booking)</span>
-        <input className="field" name="addressLine" />
-      </label>
-      <label>
-        <span className="label">Postnummer</span>
-        <input className="field" name="postalCode" />
-      </label>
+      </Field>
+      <Field id="job-address" label="Eksakt adresse (låst til betalt booking)">
+        <input className="field" id="job-address" name="addressLine" value={values.addressLine} onChange={set("addressLine")} />
+      </Field>
+      <Field id="job-postal" label="Postnummer">
+        <input className="field" id="job-postal" name="postalCode" value={values.postalCode} onChange={set("postalCode")} />
+      </Field>
       <div className="grid grid-cols-2 gap-3">
-        <label>
-          <span className="label">Budsjett fra (NOK)</span>
-          <input className="field" name="budgetMin" type="number" min={0} />
-        </label>
-        <label>
-          <span className="label">Budsjett til (NOK)</span>
-          <input className="field" name="budgetMax" type="number" min={0} />
-        </label>
+        <Field id="job-budget-min" label="Budsjett fra (NOK)">
+          <input
+            className="field"
+            id="job-budget-min"
+            name="budgetMin"
+            type="number"
+            min={0}
+            step="1"
+            value={values.budgetMin}
+            onChange={set("budgetMin")}
+          />
+        </Field>
+        <Field id="job-budget-max" label="Budsjett til (NOK)">
+          <input
+            className="field"
+            id="job-budget-max"
+            name="budgetMax"
+            type="number"
+            min={0}
+            step="1"
+            value={values.budgetMax}
+            onChange={set("budgetMax")}
+          />
+        </Field>
       </div>
-      <JobImagePicker />
+      {!jobId ? <JobImagePicker /> : null}
       <p className="text-sm text-ink-soft">
         Ikke skriv telefon, e-post eller lenker her. Filteret stopper det med en forklaring, og du kan rette teksten.
       </p>
       <button className="btn btn-copper" disabled={pending} type="submit">
-        {pending ? "Legger ut…" : "Publiser oppdrag"}
+        {pending ? "Lagrer…" : jobId ? "Lagre endringer" : "Publiser oppdrag"}
       </button>
     </form>
   );
@@ -184,29 +338,56 @@ export function JobForm() {
 
 export function OfferForm({
   jobId,
-  feePreview,
+  feeBps,
+  defaultAmountOre,
 }: {
   jobId: string;
-  feePreview: { feeOre: number; payoutOre: number; amountOre: number };
+  feeBps: number;
+  defaultAmountOre: number;
 }) {
   const [state, action, pending] = useActionState(createOfferAction, {});
+  const [amount, setAmount] = useState(String(Math.round(defaultAmountOre / 100)));
+  const [message, setMessage] = useState("");
+  const amountOre = Number(amount) > 0 ? nokToOre(Number(amount)) : 0;
+  const preview = amountOre > 0 ? calcCommission(amountOre, feeBps) : null;
+
   return (
     <form action={action} className="grid gap-3">
       <input type="hidden" name="jobId" value={jobId} />
       <ErrorBox state={state} />
-      <label>
-        <span className="label">Fastpris (NOK)</span>
-        <input className="field" name="amount" type="number" min={100} required defaultValue={Math.round(feePreview.amountOre / 100)} />
-      </label>
-      <label>
-        <span className="label">Melding til kunden</span>
-        <textarea className="field min-h-28" name="message" required placeholder="Hva inngår, når kan dere starte?" />
-      </label>
-      <p className="text-xs text-ink-soft">
-        Ved {Math.round(feePreview.amountOre / 100)} NOK er plattformgebyret{" "}
-        {Math.round(feePreview.feeOre / 100)} NOK (avregnes etter avtale, typisk faktura). Planlagt: Vipps
-        reserverer kundens beløp; dere får oppgjør når kunden godkjenner. I DEMO: ingen ekte trekk.
-      </p>
+      <Field id="offer-amount" label="Fastpris (NOK)">
+        <input
+          className="field"
+          id="offer-amount"
+          name="amount"
+          type="number"
+          min={100}
+          required
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+        />
+      </Field>
+      <Field id="offer-message" label="Melding til kunden">
+        <textarea
+          className="field min-h-28"
+          id="offer-message"
+          name="message"
+          required
+          placeholder="Hva inngår, når kan dere starte?"
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+        />
+      </Field>
+      {preview ? (
+        <FeeBox
+          amountOre={amountOre}
+          feeOre={preview.platformFeeOre}
+          payoutOre={preview.providerPayoutOre}
+          audience="provider"
+        />
+      ) : (
+        <p className="text-xs text-ink-soft">Skriv inn pris for å se gebyr og illustrasjon etter faktura.</p>
+      )}
       <button className="btn btn-copper" disabled={pending} type="submit">
         {pending ? "Sender…" : "Gi tilbud"}
       </button>
@@ -216,13 +397,29 @@ export function OfferForm({
 
 export function ChatForm({ conversationId }: { conversationId: string }) {
   const [state, action, pending] = useActionState(sendMessageAction, {});
+  const [body, setBody] = useState("");
+  useEffect(() => {
+    if (state?.ok) setBody("");
+  }, [state]);
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="conversationId" value={conversationId} />
       <ErrorBox state={state} />
       {state?.ok ? <Alert tone="ok">Meldingen er sendt.</Alert> : null}
-      <textarea className="field min-h-24" name="body" required placeholder="Skriv en melding uten telefon, e-post eller lenker" />
-      <p className="text-xs text-ink-soft">Vedlegg er slått av i v1. Filteret kan treffe feil — juster teksten og send på nytt.</p>
+      <Field id="chat-body" label="Melding">
+        <textarea
+          className="field min-h-24"
+          id="chat-body"
+          name="body"
+          required
+          placeholder="Skriv en melding uten telefon, e-post eller lenker"
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+        />
+      </Field>
+      <p className="text-xs text-ink-soft">
+        Vedlegg er slått av i v1. Filteret kan treffe feil — juster teksten og send på nytt.
+      </p>
       <button className="btn btn-primary" disabled={pending} type="submit">
         {pending ? "Sender…" : "Send"}
       </button>
@@ -238,11 +435,12 @@ export function ReportForm({ targetUserId, targetJobId }: { targetUserId?: strin
       {targetJobId ? <input type="hidden" name="targetJobId" value={targetJobId} /> : null}
       <ErrorBox state={state} />
       {state?.ok ? <Alert tone="ok">Takk. Rapporten er sendt til admin.</Alert> : null}
-      <label>
-        <span className="label">Hvorfor vil du melde fra?</span>
-        <input className="field" name="reason" required />
-      </label>
-      <textarea className="field min-h-20" name="details" placeholder="Valgfri utdyping" />
+      <Field id="report-reason" label="Hvorfor vil du melde fra?">
+        <input className="field" id="report-reason" name="reason" required />
+      </Field>
+      <Field id="report-details" label="Utdyping (valgfritt)">
+        <textarea className="field min-h-20" id="report-details" name="details" placeholder="Valgfri utdyping" />
+      </Field>
       <button className="btn btn-secondary" disabled={pending} type="submit">
         {pending ? "Sender…" : "Meld fra"}
       </button>
@@ -257,17 +455,18 @@ export function ReviewForm({ bookingId }: { bookingId: string }) {
       <input type="hidden" name="bookingId" value={bookingId} />
       <ErrorBox state={state} />
       {state?.ok ? <Alert tone="ok">Takk for vurderingen.</Alert> : null}
-      <label>
-        <span className="label">Terning (1–5)</span>
-        <select className="field" name="rating" defaultValue="5">
+      <Field id="review-rating" label="Terning (1–5)">
+        <select className="field" id="review-rating" name="rating" defaultValue="5">
           <option value="5">5 — svært fornøyd</option>
           <option value="4">4</option>
           <option value="3">3</option>
           <option value="2">2</option>
           <option value="1">1</option>
         </select>
-      </label>
-      <textarea className="field min-h-24" name="comment" required />
+      </Field>
+      <Field id="review-comment" label="Kommentar">
+        <textarea className="field min-h-24" id="review-comment" name="comment" required />
+      </Field>
       <button className="btn btn-primary" disabled={pending} type="submit">
         {pending ? "Lagrer…" : "Publiser anmeldelse"}
       </button>
@@ -282,8 +481,12 @@ export function ExtraForm({ bookingId }: { bookingId: string }) {
       <input type="hidden" name="bookingId" value={bookingId} />
       <ErrorBox state={state} />
       {state?.ok ? <Alert tone="ok">Tillegg er sendt til kunden for godkjenning.</Alert> : null}
-      <input className="field" name="title" required placeholder="F.eks. Ekstra stikkontakt" />
-      <input className="field" name="amount" type="number" min={1} required placeholder="Beløp NOK" />
+      <Field id="extra-title" label="Beskrivelse av tillegg">
+        <input className="field" id="extra-title" name="title" required placeholder="F.eks. Ekstra stikkontakt" />
+      </Field>
+      <Field id="extra-amount" label="Pris (NOK)">
+        <input className="field" id="extra-amount" name="amount" type="number" min={100} required placeholder="Beløp NOK" />
+      </Field>
       <button className="btn btn-secondary" disabled={pending} type="submit">
         Foreslå tillegg
       </button>
@@ -297,9 +500,94 @@ export function CancelForm({ bookingId }: { bookingId: string }) {
     <form action={action} className="grid gap-2">
       <input type="hidden" name="bookingId" value={bookingId} />
       <ErrorBox state={state} />
-      <textarea className="field min-h-20" name="reason" required placeholder="Grunn" />
+      <Field id="cancel-reason" label="Grunn til avbestilling">
+        <textarea className="field min-h-20" id="cancel-reason" name="reason" required placeholder="Grunn" />
+      </Field>
       <button className="btn btn-secondary" disabled={pending} type="submit">
         Avbestill
+      </button>
+    </form>
+  );
+}
+
+export function ProfileForm({
+  user,
+}: {
+  user: {
+    name: string;
+    phone: string | null;
+    role: string;
+    customerProfile: { area: string | null; addressLine: string | null; postalCode: string | null; city: string | null } | null;
+    providerProfile: { about: string | null; serviceAreas: string | null } | null;
+  };
+}) {
+  const [state, action, pending] = useActionState(updateProfileAction, {});
+  return (
+    <form action={action} className="grid gap-3">
+      <ErrorBox state={state} />
+      {state?.ok ? <Alert tone="ok">Profilen er oppdatert.</Alert> : null}
+      <Field id="profile-name" label="Navn">
+        <input className="field" id="profile-name" name="name" required defaultValue={user.name} />
+      </Field>
+      <Field id="profile-phone" label="Telefon">
+        <input className="field" id="profile-phone" name="phone" defaultValue={user.phone ?? ""} />
+      </Field>
+      {user.customerProfile ? (
+        <>
+          <Field id="profile-area" label="Område">
+            <select className="field" id="profile-area" name="area" defaultValue={user.customerProfile.area ?? "Grünerløkka"}>
+              {OSLO_AREAS.map((area) => (
+                <option key={area}>{area}</option>
+              ))}
+            </select>
+          </Field>
+          <Field id="profile-address" label="Gateadresse">
+            <input className="field" id="profile-address" name="addressLine" defaultValue={user.customerProfile.addressLine ?? ""} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field id="profile-postal" label="Postnr">
+              <input className="field" id="profile-postal" name="postalCode" defaultValue={user.customerProfile.postalCode ?? ""} />
+            </Field>
+            <Field id="profile-city" label="Sted">
+              <input className="field" id="profile-city" name="city" defaultValue={user.customerProfile.city ?? "Oslo"} />
+            </Field>
+          </div>
+        </>
+      ) : null}
+      {user.providerProfile ? (
+        <>
+          <Field id="profile-about" label="Om firmaet">
+            <textarea className="field min-h-24" id="profile-about" name="about" defaultValue={user.providerProfile.about ?? ""} />
+          </Field>
+          <Field id="profile-areas" label="Områder dere dekker">
+            <input className="field" id="profile-areas" name="serviceAreas" defaultValue={user.providerProfile.serviceAreas ?? ""} />
+          </Field>
+        </>
+      ) : null}
+      <button className="btn btn-primary" disabled={pending} type="submit">
+        {pending ? "Lagrer…" : "Lagre profil"}
+      </button>
+    </form>
+  );
+}
+
+export function ContactForm() {
+  const [state, action, pending] = useActionState(contactAction, {});
+  return (
+    <form action={action} className="grid gap-3">
+      <ErrorBox state={state} />
+      {state?.ok ? <Alert tone="ok">Meldingen er sendt til eier. Dette er ikke et ticketsystem.</Alert> : null}
+      <Field id="contact-name" label="Navn">
+        <input className="field" id="contact-name" name="name" required />
+      </Field>
+      <Field id="contact-email" label="E-post">
+        <input className="field" id="contact-email" name="email" type="email" required />
+      </Field>
+      <Field id="contact-message" label="Melding">
+        <textarea className="field min-h-32" id="contact-message" name="message" required />
+      </Field>
+      <button className="btn btn-primary" disabled={pending || state?.ok} type="submit">
+        {pending ? "Sender…" : "Send melding"}
       </button>
     </form>
   );

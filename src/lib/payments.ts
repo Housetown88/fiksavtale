@@ -28,11 +28,34 @@ export function verifyWebhookSignature(rawBody: string, signature: string | null
 export async function createPaymentIntent(
   db: PrismaClient,
   bookingId: string,
+  options?: { extraChargeId?: string },
 ) {
   const booking = await db.booking.findUnique({ where: { id: bookingId } });
   if (!booking) {
     throw new Error("Bookingen finnes ikke");
   }
+
+  if (options?.extraChargeId) {
+    const extra = await db.extraCharge.findUnique({ where: { id: options.extraChargeId } });
+    if (!extra || extra.bookingId !== booking.id) {
+      throw new Error("Tillegget finnes ikke på denne bookingen");
+    }
+    if (extra.status !== "APPROVED") {
+      throw new Error("Bare godkjente tillegg kan betales.");
+    }
+    if (!["PAID", "IN_PROGRESS"].includes(booking.status)) {
+      throw new Error("Tillegg kan betales først etter at hovedjobben er bekreftet.");
+    }
+    return db.paymentIntent.create({
+      data: {
+        bookingId: booking.id,
+        extraChargeId: extra.id,
+        amountOre: extra.amountOre,
+        status: "PENDING",
+      },
+    });
+  }
+
   if (booking.status !== "PENDING_PAYMENT") {
     throw new Error("Bookingen kan ikke betales i denne tilstanden");
   }
@@ -110,7 +133,14 @@ export async function handlePaymentWebhook(
       data: { status: paymentStatus },
     });
 
-    if (paymentStatus === "SUCCEEDED" && !alreadyPaid) {
+    if (intent.extraChargeId) {
+      if (paymentStatus === "SUCCEEDED") {
+        await tx.extraCharge.update({
+          where: { id: intent.extraChargeId },
+          data: { status: "PAID" },
+        });
+      }
+    } else if (paymentStatus === "SUCCEEDED" && !alreadyPaid) {
       await tx.booking.update({
         where: { id: booking.id },
         data: {
