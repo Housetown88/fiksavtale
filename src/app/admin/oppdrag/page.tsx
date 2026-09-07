@@ -12,7 +12,7 @@ export default async function AdminJobsPage() {
       <PageTitle title="Oppdrag" />
       <div className="space-y-2">
         {jobs.map((job) => (
-          <Link key={job.id} href={`/oppdrag/${job.id}`} className="card flex items-center justify-between p-4">
+          <Link key={job.id} href={`/oppdrag/${job.id}`} className="card card-link flex items-center justify-between gap-3 p-4">
             <div>
               <p className="font-semibold">{job.title}</p>
               <p className="text-sm text-ink-soft">{job.customer.name} · {job.area}</p>

@@ -41,7 +41,7 @@ export function JobImagePicker() {
       {previews.length > 0 ? (
         <ul className="mt-1 grid grid-cols-3 gap-2">
           {previews.map((src) => (
-            <li key={src} className="overflow-hidden rounded-xl border border-line bg-paper-strong">
+            <li key={src} className="overflow-hidden rounded-[var(--radius)] border border-line bg-paper-strong">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={src} alt="" className="h-24 w-full object-cover" />
             </li>
@@ -67,7 +67,7 @@ export function JobImageGallery({
         {images.map((image, index) => (
           <li key={image.id}>
             <a
-              className="block overflow-hidden rounded-xl border border-line bg-paper-strong"
+              className="block overflow-hidden rounded-[var(--radius)] border border-line bg-paper-strong"
               href={`/api/jobs/${jobId}/images/${image.id}?variant=full`}
               target="_blank"
               rel="noreferrer"

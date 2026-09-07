@@ -7,7 +7,7 @@ export default function MilestonesPage() {
       <p>Ikke implementert i MVP. Tenkt flyt:</p>
       <ol className="list-decimal space-y-2 pl-5 text-sm">
         <li>Partene avtaler delbetalinger (f.eks. 30/40/30) i appen.</li>
-        <li>Hver del bruker planlagt Vipps-delcapture — ikke ferdig i preview.</li>
+        <li>Hver del bruker planlagt Vipps-delbetaling — ikke ferdig i preview.</li>
         <li>Kontakt låses opp etter første bekreftede del, eller etter avtalt terskel.</li>
         <li>Oppgjør til bedrift skjer per bekreftet del via Vipps. Jobbenmin oppbevarer ikke oppdragspengene.</li>
       </ol>

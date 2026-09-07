@@ -8,7 +8,7 @@ import { categoryLabel } from "@/lib/categories";
 import { calcCommission } from "@/lib/money";
 import { getPlatformFeeBps } from "@/lib/settings";
 import { acceptOfferAction } from "@/app/actions";
-import { Alert, FeeBox, PageTitle, StatusBadge, VerifiedBadge } from "@/components/ui";
+import { Alert, FeeBox, PageTitle, StarRating, StatusBadge, VerifiedBadge } from "@/components/ui";
 import { OfferForm, ReportForm } from "@/components/forms";
 import { JobImageGallery } from "@/components/JobImages";
 import { formatNok } from "@/lib/money";
@@ -77,7 +77,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
         {contact && contact.unlocked ? (
           <div className="card mt-4 p-5">
-            <h2 className="font-serif text-xl">Kontakt (låst opp etter betaling)</h2>
+            <h2 className="font-serif text-xl tracking-tight">Kontakt (låst opp etter betaling)</h2>
             <div className="mt-3 grid gap-4 text-sm md:grid-cols-2">
               <div>
                 <p className="font-semibold">Kunde</p>
@@ -96,7 +96,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           </div>
         ) : (
           <Alert tone="info">
-            Telefon, e-post og gateadresse er skjult til bookingen er betalt og webhook er bekreftet på serveren.
+            Telefon, e-post og gateadresse vises først når bookingen er betalt.
           </Alert>
         )}
 
@@ -112,12 +112,11 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <h2 className="font-serif text-2xl">Tilbud</h2>
           <div className="mt-3 space-y-3">
             {offers.map((offer) => {
+              const reviewCount = offer.provider.reviewsReceived.length;
               const rating =
-                offer.provider.reviewsReceived.length > 0
-                  ? (
-                      offer.provider.reviewsReceived.reduce((sum, review) => sum + review.rating, 0) /
-                      offer.provider.reviewsReceived.length
-                    ).toFixed(1)
+                reviewCount > 0
+                  ? offer.provider.reviewsReceived.reduce((sum, review) => sum + review.rating, 0) /
+                    reviewCount
                   : null;
               return (
                 <div key={offer.id} className="card p-4">
@@ -127,7 +126,11 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                         {offer.provider.providerProfile?.companyName ?? offer.provider.name}
                       </Link>{" "}
                       <VerifiedBadge checked={Boolean(offer.provider.providerProfile?.orgVerified)} />
-                      {rating ? <span className="ml-2 text-sm text-ink-soft">{rating} / 5</span> : null}
+                      {rating != null ? (
+                        <span className="mt-1 block">
+                          <StarRating rating={rating} count={reviewCount} />
+                        </span>
+                      ) : null}
                     </div>
                     <span className="font-serif text-xl">{formatNok(offer.amountOre)}</span>
                   </div>
@@ -138,8 +141,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   {isOwner && offer.status === "PENDING" && job.status === "OPEN" ? (
                     <form action={acceptOfferAction} className="mt-3 space-y-2">
                       <input type="hidden" name="offerId" value={offer.id} />
-                      <button className="btn btn-primary" type="submit">
-                        Godta og gå til booking (DEMO)
+                      <button className="btn btn-copper" type="submit">
+                        Velg tilbud
                       </button>
                       <p className="text-xs text-ink-soft">
                         Planlagt: Vipps-reservasjon på {formatNok(offer.amountOre)}. I preview: ingen ekte
@@ -158,7 +161,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       <aside className="space-y-4">
         {user?.role === "PROVIDER" && job.status === "OPEN" ? (
           <div className="card p-5">
-            <h2 className="font-serif text-xl">Gi tilbud</h2>
+            <h2 className="font-serif text-xl tracking-tight">Gi tilbud</h2>
             <p className="mt-1 text-sm text-ink-soft">Kunden ser totalen. Dere ser gebyr og utbetaling før dere sender.</p>
             <div className="mt-3">
               <FeeBox

@@ -10,12 +10,12 @@ export default function CancelPage() {
       </p>
       <ol className="list-decimal space-y-3 pl-5">
         <li>
-          <strong>Før capture / før ekte trekk:</strong> Kunden kan avvise tilbud eller avbestille
+          <strong>Før ekte trekk:</strong> Kunden kan avvise tilbud eller avbestille
           bookingen. Planlagt med Vipps: reservasjonen frigis, og ingen trekk skjer. I DEMO: ingen
           penger er i bevegelse — status settes til avbrutt.
         </li>
         <li>
-          <strong>Etter capture, før arbeid er startet:</strong> Avbestilling skal gi refusjon etter
+          <strong>Etter trekk, før arbeid er startet:</strong> Avbestilling skal gi refusjon etter
           avtalte regler. I DEMO er «refusjon» bare en manuell/statusendring; ekte tilbakebetaling er
           ikke koblet ennå.
         </li>
@@ -29,15 +29,14 @@ export default function CancelPage() {
           opp, kan opplysningene ikke gjøres usett. Misbruk kan rapporteres.
         </li>
         <li>
-          <strong>Milepæler / delcapture og tillegg:</strong> Planlagt, ikke ferdig. Ekstra arbeid skal
+          <strong>Milepæler og tillegg:</strong> Planlagt, ikke ferdig. Ekstra arbeid skal
           foreslås og godkjennes i appen, men godkjente tillegg er ikke koplet til et nytt
           betalingsløp ennå.
         </li>
         <li>
-          <strong>Hva preview faktisk gjør:</strong> DEMO-webhook (`payment.succeeded`) merker
-          bookingen som betalt og låser opp kontakt. Vipps reserve/capture, automatisk
-          godkjenningsfrist og ekte refusjon er ikke live. Jobbenmin er ikke bank og oppbevarer ikke
-          oppdragspengene.
+          <strong>Hva preview faktisk gjør:</strong> DEMO-bekreftelse merker bookingen som betalt og
+          låser opp kontakt. Vipps, automatisk godkjenningsfrist og ekte refusjon er ikke live.
+          Jobbenmin er ikke bank og oppbevarer ikke oppdragspengene.
         </li>
         <li>
           <strong>Reklamasjon / tvist:</strong> Booking kan settes i tvist av admin. Forbrukerkjøpsloven

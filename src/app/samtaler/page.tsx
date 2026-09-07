@@ -19,7 +19,7 @@ export default async function ConversationsPage() {
       </PageTitle>
       <div className="space-y-3">
         {conversations.map((item) => (
-          <Link key={item.id} href={`/samtaler/${item.id}`} className="card block p-4">
+          <Link key={item.id} href={`/samtaler/${item.id}`} className="card card-link block p-4">
             <div className="flex items-center justify-between gap-2">
               <p className="font-semibold">{item.job.title}</p>
               <StatusBadge status={item.job.status} />

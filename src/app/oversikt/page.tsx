@@ -57,7 +57,7 @@ export default async function OverviewPage() {
               <PlannedVippsProviderCopy />
             </div>
             <p className="text-xs text-ink-soft">
-              Tallene under er DEMO-beregninger etter webhook, ikke ekte Vipps-utbetaling.
+              Tallene under er DEMO-beregninger etter bekreftet booking, ikke ekte Vipps-utbetaling.
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -77,7 +77,7 @@ export default async function OverviewPage() {
         <h2 className="font-serif text-2xl">Bookinger</h2>
         <div className="mt-3 space-y-2">
           {bookings.map((booking) => (
-            <Link key={booking.id} href={`/booking/${booking.id}`} className="card flex items-center justify-between p-4">
+            <Link key={booking.id} href={`/booking/${booking.id}`} className="card card-link flex items-center justify-between gap-3 p-4">
               <div>
                 <p className="font-semibold">{booking.job.title}</p>
                 <p className="text-sm text-ink-soft">
@@ -103,7 +103,7 @@ export default async function OverviewPage() {
             {jobs
               .filter((job) => user.role === "ADMIN" || job.customerId === user.id)
               .map((job) => (
-                <Link key={job.id} href={`/oppdrag/${job.id}`} className="card flex items-center justify-between p-4">
+                <Link key={job.id} href={`/oppdrag/${job.id}`} className="card card-link flex items-center justify-between gap-3 p-4">
                   <div>
                     <p className="font-semibold">{job.title}</p>
                     <p className="text-sm text-ink-soft">{job.offers.length} tilbud</p>
@@ -120,7 +120,7 @@ export default async function OverviewPage() {
           <h2 className="font-serif text-2xl">Dine tilbud</h2>
           <div className="mt-3 space-y-2">
             {offers.map((offer) => (
-              <Link key={offer.id} href={`/oppdrag/${offer.jobId}`} className="card flex items-center justify-between p-4">
+              <Link key={offer.id} href={`/oppdrag/${offer.jobId}`} className="card card-link flex items-center justify-between gap-3 p-4">
                 <div>
                   <p className="font-semibold">{offer.job.title}</p>
                   <p className="text-sm text-ink-soft">{formatNok(offer.amountOre)}</p>
