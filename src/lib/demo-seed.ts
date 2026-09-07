@@ -13,7 +13,6 @@ import { createPaymentIntent, handlePaymentWebhook } from "./payments";
 import { orgNumberWithChecksum } from "./orgnr";
 import { createDemoJobImage, toPrismaBytes } from "./job-images";
 import {
-  adminDemoAllowed,
   assertStrongAdminPassword,
   bootstrapAdminCredentials,
   DEMO_ADMIN_EMAIL,

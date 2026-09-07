@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import {
   cancelBookingAction,
@@ -396,11 +396,12 @@ export function OfferForm({
 }
 
 export function ChatForm({ conversationId }: { conversationId: string }) {
-  const [state, action, pending] = useActionState(sendMessageAction, {});
   const [body, setBody] = useState("");
-  useEffect(() => {
-    if (state?.ok) setBody("");
-  }, [state]);
+  const [state, action, pending] = useActionState(async (prev: ActionState, formData: FormData) => {
+    const result = await sendMessageAction(prev, formData);
+    if (result.ok) setBody("");
+    return result;
+  }, {});
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="conversationId" value={conversationId} />
