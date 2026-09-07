@@ -30,21 +30,21 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
           Tilbake til oppdraget
         </Link>
       </PageTitle>
-      <div className="card space-y-3 p-4">
+      <div className="card space-y-3 p-4 sm:p-5">
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`max-w-[90%] rounded-2xl px-3 py-2 text-sm ${
+            className={`max-w-[90%] rounded-[var(--radius-lg)] px-3.5 py-2.5 text-sm ${
               message.senderId === user.id ? "ml-auto bg-pine text-paper" : "bg-sand"
             }`}
           >
             <p className="text-xs opacity-80">{message.sender.name}</p>
-            <p className="whitespace-pre-wrap">{message.body}</p>
+            <p className="mt-0.5 whitespace-pre-wrap">{message.body}</p>
           </div>
         ))}
         {messages.length === 0 ? <p className="text-sm text-ink-soft">Ingen meldinger ennå.</p> : null}
       </div>
-      <div className="mt-4 card p-4">
+      <div className="card mt-4 p-4 sm:p-5">
         <ChatForm conversationId={id} />
       </div>
     </div>

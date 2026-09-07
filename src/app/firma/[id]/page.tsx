@@ -1,46 +1,100 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { db } from "@/lib/db";
-import { PageTitle, VerifiedBadge } from "@/components/ui";
+import { InitialsAvatar, StarRating, VerifiedBadge } from "@/components/ui";
 import { ReportForm } from "@/components/forms";
 import { getCurrentUser } from "@/lib/session";
+import { categoryLabel } from "@/lib/categories";
 
 export default async function ProviderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getCurrentUser();
-  const provider = await db.user.findUnique({
-    where: { id },
-    include: { providerProfile: true, reviewsReceived: { include: { author: true } } },
-  });
+  const [provider, completed] = await Promise.all([
+    db.user.findUnique({
+      where: { id },
+      include: { providerProfile: true, reviewsReceived: { include: { author: true } } },
+    }),
+    db.booking.findMany({
+      where: { providerId: id, status: "COMPLETED" },
+      include: { job: { select: { id: true, title: true, category: true, area: true } } },
+      orderBy: { completedAt: "desc" },
+    }),
+  ]);
   if (!provider || !provider.providerProfile) notFound();
+  const reviewCount = provider.reviewsReceived.length;
   const avg =
-    provider.reviewsReceived.length > 0
-      ? provider.reviewsReceived.reduce((sum, review) => sum + review.rating, 0) /
-        provider.reviewsReceived.length
+    reviewCount > 0
+      ? provider.reviewsReceived.reduce((sum, review) => sum + review.rating, 0) / reviewCount
       : null;
+  const fag = [...new Set(completed.map((item) => item.job.category))];
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <PageTitle title={provider.providerProfile.companyName} kicker="Bedrift">
-        <VerifiedBadge checked={provider.providerProfile.orgVerified} />
-        <span className="ml-2 text-sm">Org.nr {provider.providerProfile.orgNumber}</span>
-      </PageTitle>
-      <div className="card p-5">
-        <p>{provider.providerProfile.about}</p>
-        <p className="mt-2 text-sm text-ink-soft">Områder: {provider.providerProfile.serviceAreas}</p>
-        <p className="mt-2 text-sm">Kontakt og fakturae-post vises først etter betalt booking.</p>
-        {avg ? <p className="mt-3 font-semibold">{avg.toFixed(1)} / 5 fra fullførte jobber</p> : null}
-      </div>
-      <div className="space-y-3">
-        {provider.reviewsReceived.map((review) => (
-          <div key={review.id} className="card p-4">
-            <p className="font-semibold">{review.rating}/5 · {review.author.name}</p>
-            <p className="text-sm">{review.comment}</p>
+      <div className="card p-5 sm:p-6">
+        <div className="flex items-start gap-4">
+          <InitialsAvatar name={provider.providerProfile.companyName} size="lg" />
+          <div>
+            <p className="kicker">Bedrift</p>
+            <h1 className="mt-1 font-serif text-3xl tracking-tight text-ink sm:text-4xl">
+              {provider.providerProfile.companyName}
+            </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <VerifiedBadge checked={provider.providerProfile.orgVerified} />
+              <span className="text-sm text-ink-soft">Org.nr {provider.providerProfile.orgNumber}</span>
+            </div>
           </div>
-        ))}
+        </div>
+        {provider.providerProfile.serviceAreas ? (
+          <p className="mt-2 text-sm text-ink-soft">Områder: {provider.providerProfile.serviceAreas}</p>
+        ) : null}
+        {fag.length > 0 ? (
+          <p className="mt-1 text-sm text-ink-soft">
+            Fag fra fullførte jobber: {fag.map((slug) => categoryLabel(slug)).join(", ")}
+          </p>
+        ) : null}
+        {provider.providerProfile.about ? (
+          <p className="mt-4 whitespace-pre-wrap">{provider.providerProfile.about}</p>
+        ) : null}
+        <p className="mt-3 text-sm text-ink-soft">Kontakt og fakturae-post vises først etter betalt booking.</p>
+        {avg != null ? (
+          <p className="mt-3">
+            <StarRating rating={avg} count={reviewCount} />
+            <span className="ml-2 text-sm text-ink-soft">fra fullførte jobber</span>
+          </p>
+        ) : null}
       </div>
+
+      {reviewCount > 0 ? (
+        <section className="space-y-3">
+          <h2 className="font-serif text-2xl tracking-tight">Vurderinger</h2>
+          {provider.reviewsReceived.map((review) => (
+            <div key={review.id} className="card p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <StarRating rating={review.rating} />
+                <p className="text-sm font-semibold">{review.author.name}</p>
+              </div>
+              <p className="mt-2 text-sm">{review.comment}</p>
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      {completed.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="font-serif text-2xl tracking-tight">Fullførte jobber</h2>
+          {completed.map((booking) => (
+            <Link key={booking.id} href={`/oppdrag/${booking.job.id}`} className="card card-link p-4">
+              <p className="text-sm font-semibold text-moss">{categoryLabel(booking.job.category)}</p>
+              <p className="mt-1 font-semibold">{booking.job.title}</p>
+              <p className="text-sm text-ink-soft">{booking.job.area}</p>
+            </Link>
+          ))}
+        </section>
+      ) : null}
+
       {user ? (
         <div className="card p-5">
-          <h2 className="font-serif text-xl">Meld fra om brukeren</h2>
+          <h2 className="font-serif text-xl tracking-tight">Meld fra om brukeren</h2>
           <ReportForm targetUserId={provider.id} />
         </div>
       ) : null}

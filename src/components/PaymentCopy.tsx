@@ -5,17 +5,13 @@ import Link from "next/link";
 export function PaymentPlanBadge() {
   return (
     <span className="inline-flex rounded-full bg-moss/10 px-3 py-1 text-xs font-semibold text-pine">
-      Vipps reserve → trekk ved godkjenning (planlagt)
+      DEMO nå · Vipps planlagt
     </span>
   );
 }
 
 export function DemoNowCopy() {
-  return (
-    <p>
-      Betaling bygges med Vipps reserve og capture. I preview brukes kun DEMO — ingen ekte trekk.
-    </p>
-  );
+  return <p>I preview bruker vi DEMO — ingen ekte trekk. Pengene går ikke via Jobbenmin.</p>;
 }
 
 export function PlannedVippsCustomerCopy() {
@@ -41,13 +37,13 @@ export function CheckoutPaymentCopy({ amountLabel }: { amountLabel: string }) {
   return (
     <div className="space-y-2 text-sm text-ink-soft">
       <p>
-        Du godkjenner en Vipps-reservasjon på {amountLabel} (planlagt). Firmaet får oppgjør når jobben
-        er godkjent (eller etter frist). Plattformgebyr avregnes med firmaet etter avtalen. DEMO: ingen
-        ekte betaling.
+        Du godkjenner en reservasjon på {amountLabel} (planlagt med Vipps). Firmaet får oppgjør når
+        jobben er godkjent (eller etter frist). Plattformgebyr avregnes med firmaet etter avtalen. DEMO:
+        ingen ekte betaling.
       </p>
       <p>
-        I preview bekrefter en DEMO-webhook bookingen og låser opp kontakt. Vipps reserve, capture,
-        automatisk frist og refusjon er ikke koblet ennå.{" "}
+        I preview bekreftes bookingen uten ekte trekk, og kontakt blir synlig når betalingen er merket
+        som fullført. Vipps, automatisk frist og refusjon er ikke koblet ennå.{" "}
         <Link href="/avbestilling" className="underline">
           Avbestillingsregler
         </Link>

@@ -11,11 +11,12 @@ export default function TermsPage() {
       <ul className="list-disc space-y-2 pl-5 text-sm">
         <li>Plattformen formidler kontakt mellom kunde og bedrift. Vi utfører ikke arbeidet.</li>
         <li>Registrering, utlegging og tilbud er gratis. Gebyr tas bare av betalte jobber.</li>
-        <li>Direkte kontakt og eksakt adresse låses til serverbekreftet betaling.</li>
+        <li>Direkte kontakt og eksakt adresse låses til betalt booking.</li>
         <li>Når kontakt først er låst opp, kan den ikke gjøres usett.</li>
         <li>
-          DEMO-betaling er simulert (webhook). Planlagt: Vipps reserve og capture. Jobbenmin er ikke
-          bank og oppbevarer ikke oppdragspengene. Ekte betalingsavtale må avklares før produksjon.
+          DEMO-betaling er simulert. Planlagt: Vipps reserverer beløpet og trekker ved godkjenning.
+          Jobbenmin er ikke bank og oppbevarer ikke oppdragspengene. Ekte betalingsavtale må avklares
+          før produksjon.
         </li>
       </ul>
     </article>

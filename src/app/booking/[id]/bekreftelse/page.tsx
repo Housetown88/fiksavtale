@@ -28,14 +28,14 @@ export default async function PaymentConfirmPage({
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
-      <PageTitle kicker="DEMO-betaling" title="Bekreftelse venter på serveren">
-        Denne siden er bare en redirect. Den låser ikke opp kontakt alene. Vipps er ikke live.
+      <PageTitle kicker="DEMO-betaling" title="Betalingen er ikke ferdig ennå">
+        Denne siden alene åpner ikke kontakt. Vipps er ikke live.
       </PageTitle>
       <div className="card space-y-3 p-5">
         <p className="text-sm text-ink-soft">
-          I preview bekrefter en signert DEMO-webhook bookingen. Planlagt med Vipps: reservasjon ved
-          booking, trekk først når du godkjenner jobben (eller etter frist). Jobbenmin oppbevarer ikke
-          oppdragspengene.
+          I preview må DEMO-bekreftelsen under kjøres for at bookingen skal merkes som betalt.
+          Planlagt med Vipps: reservasjon ved booking, trekk først når du godkjenner jobben (eller
+          etter frist). Jobbenmin oppbevarer ikke oppdragspengene.
         </p>
         <p>
           Bookingstatus: <StatusBadge status={booking.status} />
@@ -47,8 +47,8 @@ export default async function PaymentConfirmPage({
           <Alert tone="ok">Webhook er mottatt. Kontakt er nå tilgjengelig for partene.</Alert>
         ) : (
           <Alert tone="warn">
-            Kontakt er fortsatt låst. Send en signert DEMO-webhook under for å simulere `payment.succeeded`
-            eller en feilet/kansellert betaling.
+            Kontakt er fortsatt låst. Bruk DEMO-knappene under for å simulere vellykket, feilet eller
+            avbrutt betaling.
           </Alert>
         )}
         {intent && booking.status === "PENDING_PAYMENT" ? (

@@ -63,7 +63,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
               </div>
               {booking.status === "PENDING_PAYMENT" ? (
                 <p className="text-xs text-ink-soft">
-                  I preview venter bookingen på DEMO-webhook. Ingen ekte Vipps-reservasjon er lagt.
+                  I preview venter bookingen på DEMO-bekreftelse. Ingen ekte Vipps-reservasjon er lagt.
                 </p>
               ) : null}
             </div>
@@ -85,7 +85,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
                 </button>
               </form>
               <p className="text-xs text-ink-soft">
-                I DEMO er bookingen allerede merket betalt etter webhook. Planlagt med Vipps: godkjenning
+                I DEMO er bookingen allerede merket betalt etter bekreftelse. Planlagt med Vipps: godkjenning
                 (eller avtalt frist) utløser trekket.
               </p>
             </div>

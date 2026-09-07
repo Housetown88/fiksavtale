@@ -1,17 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --paper: #f6f1e7;
-  --paper-strong: #fffdf8;
+  --paper: #f4f0e6;
+  --paper-strong: #ffffff;
   --ink: #1b1914;
-  --ink-soft: #4a453c;
-  --pine: #1d3d32;
+  --ink-soft: #5c564c;
+  --pine: #16362d;
   --moss: #2f6b52;
-  --copper: #b86a3d;
-  --sand: #e4d8c4;
-  --line: #d7ccb8;
+  --copper: #c46a32;
+  --copper-deep: #9d4f22;
+  --sand: #ebe3d4;
+  --line: #d9d0c0;
   --danger: #8f2d2d;
   --ok: #1f6b45;
+  --radius: 0.75rem;
+  --radius-lg: 0.875rem;
+  --shadow-card: 0 1px 2px rgba(27, 25, 20, 0.04), 0 10px 28px rgba(27, 25, 20, 0.04);
+  --shadow-hover: 0 2px 6px rgba(27, 25, 20, 0.06), 0 14px 32px rgba(27, 25, 20, 0.07);
 }
 
 @theme inline {
@@ -22,6 +27,7 @@
   --color-pine: var(--pine);
   --color-moss: var(--moss);
   --color-copper: var(--copper);
+  --color-copper-deep: var(--copper-deep);
   --color-sand: var(--sand);
   --color-line: var(--line);
   --color-danger: var(--danger);
@@ -36,10 +42,7 @@ html {
 }
 
 body {
-  background:
-    radial-gradient(1200px 500px at 10% -10%, rgba(47, 107, 82, 0.08), transparent),
-    radial-gradient(900px 400px at 100% 0%, rgba(184, 106, 61, 0.08), transparent),
-    var(--paper);
+  background: var(--paper);
   color: var(--ink);
   min-height: 100%;
 }
@@ -48,25 +51,47 @@ a {
   color: inherit;
 }
 
+:focus-visible {
+  outline: 2px solid var(--moss);
+  outline-offset: 2px;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-radius: 999px;
-  padding: 0.75rem 1.15rem;
+  min-height: 2.75rem;
+  border-radius: var(--radius);
+  padding: 0.7rem 1.15rem;
   font-weight: 600;
   letter-spacing: 0.01em;
-  transition: transform 120ms ease, background 120ms ease, color 120ms ease;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
 .btn:hover {
-  transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgba(27, 25, 20, 0.04);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.btn-sm {
+  min-height: 2.25rem;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.875rem;
 }
 
 .btn-primary {
   background: var(--pine);
   color: #f7f3eb;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #1d463a;
 }
 
 .btn-secondary {
@@ -75,23 +100,44 @@ a {
   border: 1px solid var(--line);
 }
 
+.btn-secondary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--pine) 28%, var(--line));
+  background: #fffdf8;
+}
+
 .btn-copper {
   background: var(--copper);
   color: #fffaf3;
 }
 
+.btn-copper:hover:not(:disabled) {
+  background: var(--copper-deep);
+}
+
 .card {
   background: var(--paper-strong);
   border: 1px solid var(--line);
-  border-radius: 1.25rem;
-  box-shadow: 0 1px 0 rgba(27, 25, 20, 0.03);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.card-link {
+  display: block;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.card-link:hover {
+  border-color: color-mix(in srgb, var(--pine) 22%, var(--line));
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
 }
 
 .field {
   width: 100%;
+  min-height: 2.75rem;
   border: 1px solid var(--line);
   background: #fffdf8;
-  border-radius: 0.85rem;
+  border-radius: var(--radius);
   padding: 0.7rem 0.85rem;
   color: var(--ink);
 }
@@ -107,4 +153,28 @@ a {
   font-weight: 650;
   margin-bottom: 0.35rem;
   color: var(--ink-soft);
+}
+
+.kicker {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--moss);
+}
+
+.nav-link {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.nav-link:hover {
+  color: var(--pine);
+}
+
+.tap-target {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }

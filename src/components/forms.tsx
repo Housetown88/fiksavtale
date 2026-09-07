@@ -175,7 +175,7 @@ export function JobForm() {
       <p className="text-sm text-ink-soft">
         Ikke skriv telefon, e-post eller lenker her. Filteret stopper det med en forklaring, og du kan rette teksten.
       </p>
-      <button className="btn btn-primary" disabled={pending} type="submit">
+      <button className="btn btn-copper" disabled={pending} type="submit">
         {pending ? "Legger ut…" : "Publiser oppdrag"}
       </button>
     </form>
@@ -207,8 +207,8 @@ export function OfferForm({
         {Math.round(feePreview.feeOre / 100)} NOK (avregnes etter avtale, typisk faktura). Planlagt: Vipps
         reserverer kundens beløp; dere får oppgjør når kunden godkjenner. I DEMO: ingen ekte trekk.
       </p>
-      <button className="btn btn-primary" disabled={pending} type="submit">
-        {pending ? "Sender…" : "Send tilbud"}
+      <button className="btn btn-copper" disabled={pending} type="submit">
+        {pending ? "Sender…" : "Gi tilbud"}
       </button>
     </form>
   );

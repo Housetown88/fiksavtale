@@ -20,6 +20,8 @@ export default async function JobsPage({
     budgetMinOre: number | null;
     budgetMaxOre: number | null;
     status: string;
+    createdAt: Date;
+    offerCount: number;
   }[] = [];
   let dbError: string | null = null;
   const availability = canUseDatabase();
@@ -28,7 +30,7 @@ export default async function JobsPage({
   } else {
     try {
       await maybeSeedDemo(db);
-      jobs = await db.job.findMany({
+      const rows = await db.job.findMany({
         where: {
           status: "OPEN",
           category: params.category || undefined,
@@ -41,7 +43,20 @@ export default async function JobsPage({
             : undefined,
         },
         orderBy: { createdAt: "desc" },
+        include: { _count: { select: { offers: true } } },
       });
+      jobs = rows.map((job) => ({
+        id: job.id,
+        title: job.title,
+        description: job.description,
+        category: job.category,
+        area: job.area,
+        budgetMinOre: job.budgetMinOre,
+        budgetMaxOre: job.budgetMaxOre,
+        status: job.status,
+        createdAt: job.createdAt,
+        offerCount: job._count.offers,
+      }));
     } catch {
       dbError = "Kunne ikke hente oppdrag. Databasen er utilgjengelig eller ikke klargjort.";
     }
@@ -75,7 +90,7 @@ export default async function JobsPage({
       </form>
       <div className="grid gap-4 md:grid-cols-2">
         {jobs.map((job) => (
-          <JobCard key={job.id} job={job} />
+          <JobCard key={job.id} job={job} showDescription />
         ))}
       </div>
       {jobs.length === 0 ? <p className="text-ink-soft">Ingen treff. Prøv et annet filter.</p> : null}

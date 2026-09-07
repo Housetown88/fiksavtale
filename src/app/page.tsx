@@ -1,15 +1,9 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { JobCard } from "@/components/ui";
+import { JobCard, SectionHeader } from "@/components/ui";
+import { CategoryGrid } from "@/components/CategoryGrid";
 import { DatabaseStatus } from "@/components/DatabaseStatus";
-import {
-  DemoNowCopy,
-  PaymentPlanBadge,
-  PlannedVippsCustomerCopy,
-  PlannedVippsProviderCopy,
-} from "@/components/PaymentCopy";
-import { formatNok, DEFAULT_PLATFORM_FEE_BPS, calcCommission } from "@/lib/money";
-import { getPlatformFeeBps } from "@/lib/settings";
+import { DemoNowCopy, PaymentPlanBadge, PlannedVippsCustomerCopy } from "@/components/PaymentCopy";
 import { maybeSeedDemo } from "@/lib/demo-seed";
 import { canUseDatabase } from "@/lib/database-url";
 
@@ -23,8 +17,9 @@ export default async function HomePage() {
     budgetMinOre: number | null;
     budgetMaxOre: number | null;
     status: string;
+    createdAt: Date;
+    offerCount: number;
   }[] = [];
-  let feeBps = DEFAULT_PLATFORM_FEE_BPS;
   let dbError: string | null = null;
 
   const availability = canUseDatabase();
@@ -33,129 +28,80 @@ export default async function HomePage() {
   } else {
     try {
       await maybeSeedDemo(db);
-      jobs = await db.job.findMany({
+      const rows = await db.job.findMany({
         where: { status: "OPEN" },
         orderBy: { createdAt: "desc" },
-        take: 3,
+        take: 6,
+        include: { _count: { select: { offers: true } } },
       });
-      feeBps = await getPlatformFeeBps(db);
+      jobs = rows.map((job) => ({
+        id: job.id,
+        title: job.title,
+        description: job.description,
+        category: job.category,
+        area: job.area,
+        budgetMinOre: job.budgetMinOre,
+        budgetMaxOre: job.budgetMaxOre,
+        status: job.status,
+        createdAt: job.createdAt,
+        offerCount: job._count.offers,
+      }));
     } catch {
       dbError =
         "Kunne ikke hente oppdrag akkurat nå. Sjekk at DATABASE_URL peker på Neon eller Turso, og at tabellene er opprettet med npm run db:push.";
     }
   }
 
-  const example = calcCommission(500_000, feeBps);
-
   return (
-    <div className="space-y-12">
-      <section className="grid gap-8 md:grid-cols-[1.2fr_0.8fr] md:items-center">
+    <div className="space-y-12 sm:space-y-16">
+      <section className="grid gap-8 md:grid-cols-[1.15fr_0.85fr] md:items-center">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Norsk tjenesteavtale</p>
-          <h1 className="mt-3 font-serif text-4xl leading-tight tracking-tight sm:text-5xl">
-            Avtale først.<br />Kontakt etter betaling.
+          <h1 className="font-serif text-4xl leading-[1.08] tracking-tight sm:text-5xl">
+            Få jobben gjort.
           </h1>
-          <div className="mt-4">
-            <PaymentPlanBadge />
-          </div>
           <p className="mt-4 max-w-xl text-lg text-ink-soft">
-            Jobbenmin er en markedsplass der kunder legger ut jobb, verifiserte bedrifter gir tilbud, og
-            partene snakker i appen. Telefon, e-post og eksakt adresse låses opp først når bookingen er
-            bekreftet på serveren — ikke av en suksess-side alene.
+            Legg ut jobben gratis og få tilbud fra lokale bedrifter.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/registrer" className="btn btn-primary">
-              Opprett konto
+            <Link href="/oppdrag/nytt" className="btn btn-copper">
+              Legg ut en jobb
             </Link>
-            <Link href="/oppdrag" className="btn btn-secondary">
-              Se åpne oppdrag
+            <Link href="/oppdrag" className="btn btn-primary">
+              Finn oppdrag
             </Link>
           </div>
+          <ul className="mt-6 space-y-2 text-sm text-ink-soft">
+            <li>Bedrifter med org.nr</li>
+            <li>Trygg betaling i appen</li>
+            <li>Chat og avtale før kontakt</li>
+          </ul>
+          <p className="mt-4 text-sm text-ink-soft">Avtale først. Kontakt etter betaling.</p>
         </div>
         <div className="card p-6">
-          <p className="text-sm font-semibold text-copper">DEMO-gebyr</p>
-          <p className="mt-2 font-serif text-2xl">5 000 NOK jobb</p>
-          <ul className="mt-4 space-y-2 text-sm">
-            <li>Plattformgebyr ({feeBps / 100}%): {formatNok(example.platformFeeOre)}</li>
-            <li>Til bedriften: {formatNok(example.providerPayoutOre)}</li>
-          </ul>
-          <p className="mt-4 text-xs text-ink-soft">
-            Før kortgebyr og MVA. Jobbenmin er ikke bank og oppbevarer ikke oppdragspengene.
-          </p>
+          <p className="kicker">Slik starter du</p>
+          <ol className="mt-4 space-y-3 text-sm">
+            <li>
+              <span className="font-semibold text-ink">1. Beskriv jobben</span>
+              <p className="text-ink-soft">Gratis å legge ut. Område vises, ikke gateadresse.</p>
+            </li>
+            <li>
+              <span className="font-semibold text-ink">2. Sammenlign tilbud</span>
+              <p className="text-ink-soft">Lokale bedrifter svarer i appen.</p>
+            </li>
+            <li>
+              <span className="font-semibold text-ink">3. Book og betal</span>
+              <p className="text-ink-soft">Kontakt åpnes når bookingen er betalt.</p>
+            </li>
+          </ol>
         </div>
       </section>
 
       {dbError ? <DatabaseStatus message={dbError} /> : null}
 
-      <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="card space-y-4 p-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-serif text-2xl">Trygg betaling</h2>
-            <PaymentPlanBadge />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-moss">Nå (DEMO / preview)</p>
-            <div className="mt-1 text-sm text-ink-soft">
-              <DemoNowCopy />
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-moss">Slik er det planlagt med Vipps (når avtalen er på plass)</p>
-            <div className="mt-1 text-sm text-ink-soft">
-              <PlannedVippsCustomerCopy />
-            </div>
-          </div>
-          <p className="text-xs text-ink-soft">
-            Implementert i preview: DEMO-webhook merker bookingen som betalt og låser opp kontakt. Ikke
-            implementert: ekte Vipps, refusjon, automatisk godkjenningsfrist.{" "}
-            <Link href="/avbestilling" className="font-semibold text-moss underline">
-              Avbestilling og reklamasjon
-            </Link>
-          </p>
-        </div>
-        <div className="card space-y-3 p-6">
-          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-copper">For bedrifter</p>
-          <h2 className="font-serif text-2xl">Oppgjør via Vipps (planlagt)</h2>
-          <div className="text-sm text-ink-soft">
-            <PlannedVippsProviderCopy />
-          </div>
-        </div>
-      </section>
-
       <section>
-        <h2 className="mb-4 font-serif text-2xl">Slik fungerer det</h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          {[
-            [
-              "1. Legg ut eller gi tilbud",
-              "Gratis å registrere, legge ut og by. Bedrifter oppgir org.nr. Dere snakker i appen uten å bytte telefon.",
-            ],
-            [
-              "2. Book — reservasjon (planlagt)",
-              "Når du godtar et tilbud, reserveres beløpet i Vipps. I preview: DEMO uten ekte trekk. Kontakt låses opp når DEMO-webhook bekrefter bookingen.",
-            ],
-            [
-              "3. Godkjenn — da trekkes beløpet",
-              "Firmaet gjør jobben. Planlagt: beløpet trekkes når du godkjenner, eller etter avtalt frist. Avbestiller du før trekket, frigjøres reservasjonen.",
-            ],
-          ].map(([title, body]) => (
-            <div key={title} className="card p-5">
-              <h3 className="font-serif text-xl">{title}</h3>
-              <p className="mt-2 text-sm text-ink-soft">{body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <div className="mb-4 flex items-end justify-between">
-          <h2 className="font-serif text-2xl">Åpne oppdrag i Oslo</h2>
-          <Link href="/oppdrag" className="text-sm font-semibold text-moss">
-            Alle oppdrag
-          </Link>
-        </div>
+        <SectionHeader title="Åpne oppdrag" href="/oppdrag" linkLabel="Se alle oppdrag →" />
         {jobs.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {jobs.map((job) => (
               <JobCard key={job.id} job={job} />
             ))}
@@ -163,6 +109,64 @@ export default async function HomePage() {
         ) : !dbError ? (
           <p className="text-ink-soft">Ingen åpne oppdrag ennå. Logg inn som kunde og legg ut det første.</p>
         ) : null}
+      </section>
+
+      <section>
+        <SectionHeader title="Populære fag" href="/oppdrag" linkLabel="Alle oppdrag →" />
+        <CategoryGrid />
+      </section>
+
+      <section>
+        <SectionHeader title="Slik fungerer det" />
+        <div className="grid gap-4 md:grid-cols-3">
+          {[
+            [
+              "1. Legg ut jobben",
+              "Beskriv hva som skal gjøres. Det er gratis, og du oppgir bare synlig område — ikke telefon.",
+            ],
+            [
+              "2. Motta tilbud",
+              "Lokale bedrifter med org.nr gir pris. Dere snakker i appen til dere er enige.",
+            ],
+            [
+              "3. Velg og betal",
+              "Velg et tilbud og betal i appen. Da åpnes telefon, e-post og adresse.",
+            ],
+          ].map(([title, body]) => (
+            <div key={title} className="card p-5">
+              <h3 className="font-serif text-xl tracking-tight">{title}</h3>
+              <p className="mt-2 text-sm text-ink-soft">{body}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          {[
+            ["For bedrifter: Finn oppdrag", "Se åpne jobber i Oslo og filtrer på fag."],
+            ["Gi tilbud", "Kunden ser totalen. Dere ser gebyr før dere sender."],
+            ["Gjør jobben", "Kontakt deles når bookingen er betalt. Oppgjør via Vipps er planlagt."],
+          ].map(([title, body]) => (
+            <div key={title} className="rounded-[var(--radius-lg)] border border-line/80 bg-sand/40 p-5">
+              <h3 className="font-semibold">{title}</h3>
+              <p className="mt-1 text-sm text-ink-soft">{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="card p-6 sm:p-8">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="font-serif text-2xl tracking-tight">Trygg betaling</h2>
+          <PaymentPlanBadge />
+        </div>
+        <div className="mt-3 max-w-2xl space-y-3 text-sm text-ink-soft">
+          <DemoNowCopy />
+          <PlannedVippsCustomerCopy />
+        </div>
+        <p className="mt-4 text-sm">
+          <Link href="/avbestilling" className="font-semibold text-moss hover:underline">
+            Avbestilling og reklamasjon
+          </Link>
+        </p>
       </section>
     </div>
   );

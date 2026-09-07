@@ -14,7 +14,7 @@ export default async function NewJobPage() {
       <PageTitle kicker="Nytt oppdrag" title="Fortell hva som skal fikses">
         Skriv område, ikke telefonnummer. Adressen låses til den betalte bookingen. Du kan legge ved bilder av jobben.
       </PageTitle>
-      <div className="card p-5">
+      <div className="card p-5 sm:p-6">
         <JobForm />
       </div>
     </div>
