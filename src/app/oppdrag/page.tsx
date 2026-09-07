@@ -69,16 +69,12 @@ export default async function JobsPage({
       </PageTitle>
       {dbError ? <DatabaseStatus message={dbError} /> : null}
       <form className="card mb-6 grid gap-3 p-4 md:grid-cols-4" method="get">
-        <label className="grid gap-1">
-          <span className="label" htmlFor="job-search">
-            Søk
-          </span>
+        <label className="grid gap-1" htmlFor="job-search">
+          <span className="label">Søk</span>
           <input className="field" id="job-search" name="q" placeholder="Søk" defaultValue={params.q} />
         </label>
-        <label className="grid gap-1">
-          <span className="label" htmlFor="job-category-filter">
-            Fag
-          </span>
+        <label className="grid gap-1" htmlFor="job-category-filter">
+          <span className="label">Fag</span>
           <select className="field" id="job-category-filter" name="category" defaultValue={params.category ?? ""}>
             <option value="">Alle fag</option>
             {JOB_CATEGORIES.map((item) => (
@@ -88,10 +84,8 @@ export default async function JobsPage({
             ))}
           </select>
         </label>
-        <label className="grid gap-1">
-          <span className="label" htmlFor="job-area-filter">
-            Område
-          </span>
+        <label className="grid gap-1" htmlFor="job-area-filter">
+          <span className="label">Område</span>
           <select className="field" id="job-area-filter" name="area" defaultValue={params.area ?? ""}>
             <option value="">Hele Oslo</option>
             {OSLO_AREAS.map((area) => (

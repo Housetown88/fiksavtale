@@ -45,10 +45,8 @@ export default async function AdminReportsPage() {
             {report.status === "OPEN" ? (
               <form action={adminReviewReportAction} className="mt-3 grid gap-2">
                 <input type="hidden" name="reportId" value={report.id} />
-                <label className="grid gap-1">
-                  <span className="label" htmlFor={`note-${report.id}`}>
-                    Behandlingsnotat
-                  </span>
+                <label className="grid gap-1" htmlFor={`note-${report.id}`}>
+                  <span className="label">Behandlingsnotat</span>
                   <textarea
                     className="field min-h-16"
                     id={`note-${report.id}`}
