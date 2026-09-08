@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { InitialsAvatar, StarRating, VerifiedBadge } from "@/components/ui";
+import { InitialsAvatar, OrgBadgeList, StarRating } from "@/components/ui";
 import { ReportForm } from "@/components/forms";
 import { getCurrentUser } from "@/lib/session";
 import { categoryLabel } from "@/lib/categories";
@@ -37,9 +37,9 @@ export default async function ProviderPage({ params }: { params: Promise<{ id: s
             <h1 className="mt-1 font-serif text-3xl tracking-tight text-ink sm:text-4xl">
               {provider.providerProfile.companyName}
             </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <VerifiedBadge checked={provider.providerProfile.orgVerified} />
+            <div className="mt-2 space-y-2">
               <span className="text-sm text-ink-soft">Org.nr {provider.providerProfile.orgNumber}</span>
+              <OrgBadgeList profile={provider.providerProfile} />
             </div>
           </div>
         </div>

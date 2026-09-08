@@ -31,13 +31,15 @@ import { nokToOre } from "@/lib/money";
 import { AuthzError } from "@/lib/authz";
 import { collectJobImageFiles, saveJobImages } from "@/lib/job-images";
 import { LeakFilterError } from "@/lib/leak-filter";
-import { adminDemoAllowed, allowDemoHints, isDemoAdminEmail } from "@/lib/demo-mode";
+import { adminDemoAllowed, isDemoAdminEmail } from "@/lib/demo-mode";
+import { headers } from "next/headers";
+import { createDataRequest, exportUserData, resolveDataRequest, type DataRequestType } from "@/lib/privacy";
+import { lookupOrgInBrreg } from "@/lib/brreg";
 
 export type ActionState = {
   error?: string;
   ok?: boolean;
   highlights?: string[];
-  resetLink?: string;
 };
 
 export async function loginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -47,7 +49,7 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
     return { error: "Demokontoen for admin er slått av i dette miljøet." };
   }
   const user = await db.user.findUnique({ where: { email } });
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+  if (!user || user.deletedAt || !(await verifyPassword(password, user.passwordHash))) {
     return { error: "Feil e-post eller passord." };
   }
   await createSession(user.id);
@@ -395,10 +397,9 @@ export async function requestPasswordResetAction(
   try {
     const email = String(formData.get("email") ?? "").toLowerCase().trim();
     if (!email) return { error: "Oppgi e-postadressen din." };
-    const result = await requestPasswordReset(db, email);
-    if (allowDemoHints() && result.token) {
-      return { ok: true, resetLink: `/tilbakestill-passord?token=${result.token}` };
-    }
+    const headerStore = await headers();
+    const ip = headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() || headerStore.get("x-real-ip");
+    await requestPasswordReset(db, email, { ip });
     return { ok: true };
   } catch (error) {
     return actionError(error);
@@ -431,4 +432,94 @@ export async function contactAction(_prev: ActionState, formData: FormData): Pro
   } catch (error) {
     return actionError(error);
   }
+}
+
+export async function requestDataAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const user = await viewer();
+    const type = String(formData.get("type") ?? "") as DataRequestType;
+    await createDataRequest(db, user, {
+      type,
+      message: String(formData.get("message") ?? "") || undefined,
+    });
+    revalidatePath("/konto");
+    return { ok: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function exportMyDataAction(): Promise<ActionState> {
+  try {
+    const user = await viewer();
+    await createDataRequest(db, user, { type: "EXPORT" });
+    await exportUserData(db, user);
+    revalidatePath("/konto");
+    return { ok: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function adminResolveDataRequestAction(formData: FormData) {
+  const user = await viewer();
+  if (user.role !== "ADMIN") throw new AuthzError("Kun admin", 403);
+  const requestId = String(formData.get("requestId") ?? "");
+  const status = String(formData.get("status") ?? "COMPLETED") === "REJECTED" ? "REJECTED" : "COMPLETED";
+  await resolveDataRequest(db, user, requestId, {
+    status,
+    adminNote: String(formData.get("adminNote") ?? "") || undefined,
+  });
+  await writeAuditLog(db, {
+    actorId: user.id,
+    action: "RESOLVE_DATA_REQUEST",
+    targetType: "DataRequest",
+    targetId: requestId,
+    details: status,
+  });
+  redirect("/admin/personvern");
+}
+
+export async function adminLookupOrgAction(formData: FormData) {
+  const user = await viewer();
+  if (user.role !== "ADMIN") throw new AuthzError("Kun admin", 403);
+  const profileId = String(formData.get("profileId") ?? "");
+  const profile = await db.providerProfile.findUnique({ where: { id: profileId } });
+  if (!profile) throw new AuthzError("Profilen finnes ikke", 404);
+  const lookup = await lookupOrgInBrreg(profile.orgNumber, profile.companyName);
+  await db.providerProfile.update({
+    where: { id: profileId },
+    data: {
+      orgRegisterStatus: lookup.status,
+      orgRegisterName: lookup.registerName,
+      orgLookupAt: new Date(),
+    },
+  });
+  await writeAuditLog(db, {
+    actorId: user.id,
+    action: "BRREG_LOOKUP",
+    targetType: "ProviderProfile",
+    targetId: profileId,
+    details: `${lookup.status} ${lookup.registerName ?? ""}`.trim(),
+  });
+  redirect("/admin/brukere");
+}
+
+export async function adminToggleRepConfirmedAction(formData: FormData) {
+  const user = await viewer();
+  if (user.role !== "ADMIN") throw new AuthzError("Kun admin", 403);
+  const profileId = String(formData.get("profileId") ?? "");
+  const confirmed = String(formData.get("orgRepConfirmed") ?? "") === "true";
+  await db.providerProfile.update({
+    where: { id: profileId },
+    data: { orgRepConfirmed: confirmed },
+  });
+  await writeAuditLog(db, {
+    actorId: user.id,
+    action: "TOGGLE_ORG_REP",
+    targetType: "ProviderProfile",
+    targetId: profileId,
+    details: `orgRepConfirmed=${confirmed}`,
+  });
+  redirect("/admin/brukere");
 }

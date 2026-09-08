@@ -8,8 +8,9 @@ export default async function AdminFeePage() {
   return (
     <div className="max-w-lg">
       <PageTitle title="Plattformgebyr">
-        Basispunkter (bps) er hundredeler av et prosentpoeng: 1000 bps = 10 %. Gebyret avregnes typisk
-        via faktura — det trekkes ikke automatisk fra Vipps i denne versjonen. Endringen logges.
+        Basispunkter (bps) er hundredeler av et prosentpoeng: 1000 bps = 10 %. Gebyret registreres
+        automatisk i oppgjørsboken når en jobb finansieres. Live Vipps-splitt finnes ikke. Endringen
+        logges.
       </PageTitle>
       <form action={adminUpdateFeeAction} className="card grid gap-3 p-5">
         <label htmlFor="admin-fee-bps">

@@ -15,9 +15,8 @@ export default function CancelPage() {
           penger er i bevegelse — status settes til avbrutt.
         </li>
         <li>
-          <strong>Etter trekk, før arbeid er startet:</strong> Avbestilling skal gi refusjon etter
-          avtalte regler. I DEMO er «refusjon» bare en manuell/statusendring; ekte tilbakebetaling er
-          ikke koblet ennå.
+          <strong>Etter finansiering, før arbeid er startet:</strong> Avbestilling registrerer full
+          DEMO-refusjon og justerer provisjonen automatisk. Ekte Vipps-tilbakebetaling er ikke koblet.
         </li>
         <li>
           <strong>Etter at arbeidet er startet:</strong> Forholdsmessig oppgjør eller tvist. Angrerett

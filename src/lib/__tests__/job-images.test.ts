@@ -7,6 +7,7 @@ import { AuthzError, getJobForViewer } from "../authz";
 import { canViewerSeeContact } from "../contact";
 import {
   JobImageError,
+  MAX_JOB_IMAGE_BYTES,
   MAX_JOB_IMAGES,
   processJobImage,
   saveJobImages,
@@ -66,6 +67,33 @@ describe("oppdragsbilder", () => {
       Array.from({ length: MAX_JOB_IMAGES + 1 }, (_, index) => pngFile(`${index}.png`)),
     );
     await expect(saveJobImages(db, job.id, tooMany)).rejects.toBeInstanceOf(JobImageError);
+  });
+
+  it("avviser for stor fil og stripper EXIF/GPS", async () => {
+    const huge = await sharp({
+      create: { width: 40, height: 40, channels: 3, background: { r: 1, g: 2, b: 3 } },
+    })
+      .jpeg()
+      .toBuffer();
+    const oversized = Buffer.concat([huge, Buffer.alloc(MAX_JOB_IMAGE_BYTES + 10)]);
+    await expect(processJobImage(oversized)).rejects.toBeInstanceOf(JobImageError);
+
+    const withGps = await sharp({
+      create: { width: 80, height: 60, channels: 3, background: { r: 8, g: 8, b: 8 } },
+    })
+      .jpeg()
+      .withMetadata({
+        exif: {
+          IFD0: { ImageDescription: "GPS 59.9123 10.7450 Markveien 12" },
+        },
+      })
+      .toBuffer();
+    expect(withGps.includes(Buffer.from("Markveien 12"))).toBe(true);
+    const processed = await processJobImage(withGps);
+    const meta = await sharp(processed.data).metadata();
+    expect(meta.exif).toBeUndefined();
+    expect(processed.data.includes(Buffer.from("Markveien 12"))).toBe(false);
+    expect(processed.data.includes(Buffer.from("GPS"))).toBe(false);
   });
 
   it("viser bilder til bydende og booket utfører uten kontaktlås", async () => {

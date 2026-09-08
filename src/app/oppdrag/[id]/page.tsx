@@ -8,7 +8,7 @@ import { categoryLabel } from "@/lib/categories";
 import { calcCommission } from "@/lib/money";
 import { getPlatformFeeBps } from "@/lib/settings";
 import { acceptOfferAction } from "@/app/actions";
-import { Alert, PageTitle, StarRating, StatusBadge, VerifiedBadge } from "@/components/ui";
+import { Alert, OrgBadgeList, PageTitle, StarRating, StatusBadge } from "@/components/ui";
 import { OfferForm, ReportForm } from "@/components/forms";
 import { JobImageGallery } from "@/components/JobImages";
 import { formatBudgetRange } from "@/lib/budget";
@@ -132,7 +132,11 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                       <Link href={`/firma/${offer.provider.id}`} className="font-semibold">
                         {offer.provider.providerProfile?.companyName ?? offer.provider.name}
                       </Link>{" "}
-                      <VerifiedBadge checked={Boolean(offer.provider.providerProfile?.orgVerified)} />
+                      {offer.provider.providerProfile ? (
+                        <span className="mt-1 block">
+                          <OrgBadgeList profile={offer.provider.providerProfile} />
+                        </span>
+                      ) : null}
                       {rating != null ? (
                         <span className="mt-1 block">
                           <StarRating rating={rating} count={reviewCount} />
@@ -144,8 +148,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   <p className="mt-2 text-sm">{offer.message}</p>
                   <p className="mt-2 text-xs text-ink-soft">
                     Status: <StatusBadge status={offer.status} />. Gebyr{" "}
-                    {formatNok(calcCommission(offer.amountOre, feeBps).platformFeeOre)} avregnes typisk via
-                    faktura.
+                    {formatNok(calcCommission(offer.amountOre, feeBps).platformFeeOre)} trekkes automatisk
+                    ved finansiering.
                     {job.status === "CANCELLED" && offer.status === "ACCEPTED"
                       ? " Tilbudet ble godtatt før bookingen ble avbestilt — det er historikk, ikke en aktiv avtale."
                       : null}
@@ -175,7 +179,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <div className="card p-5">
             <h2 className="font-serif text-xl tracking-tight">Gi tilbud</h2>
             <p className="mt-1 text-sm text-ink-soft">
-              Kunden ser totalen. Dere ser gebyr og illustrasjon etter faktura mens dere skriver prisen.
+              Kunden ser totalen. Dere ser gebyr og forventet oppgjør mens dere skriver prisen.
             </p>
             <div className="mt-3">
               <OfferForm jobId={job.id} feeBps={feeBps} defaultAmountOre={quoteAmount} />

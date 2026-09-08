@@ -17,7 +17,7 @@ export function AppShell({
     <div className="flex min-h-full flex-col">
       <div className="bg-pine text-paper">
         <p className="mx-auto max-w-6xl px-4 py-2 text-center text-xs sm:text-sm">
-          DEMO — ingen ekte Vipps-trekk. Jobbenmin er ikke bank og oppbevarer ikke oppdragspenger.
+          DEMO — ingen ekte Vipps-trekk. Provisjon registreres automatisk i oppgjørsboken ved finansiering.
         </p>
       </div>
       <header className="sticky top-0 z-30 border-b border-line/80 bg-paper-strong/95 backdrop-blur">

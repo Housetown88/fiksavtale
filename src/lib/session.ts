@@ -68,7 +68,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
         user: { include: { providerProfile: true } },
       },
     });
-    if (!session || session.expiresAt < new Date()) {
+    if (!session || session.expiresAt < new Date() || session.user.deletedAt) {
       if (session) {
         await db.session.delete({ where: { id: session.id } });
       }

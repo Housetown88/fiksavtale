@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { Alert, PageTitle, VerifiedBadge } from "@/components/ui";
-import { adminToggleVerifyAction } from "@/app/actions";
+import { Alert, OrgBadgeList, PageTitle } from "@/components/ui";
+import { adminLookupOrgAction, adminToggleRepConfirmedAction, adminToggleVerifyAction } from "@/app/actions";
 import { isKnownDemoEmail } from "@/lib/demo-mode";
 
 export default async function AdminUsersPage() {
@@ -35,16 +35,42 @@ export default async function AdminUsersPage() {
               )}
             </p>
             {user.providerProfile ? (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span>{user.providerProfile.companyName} · {user.providerProfile.orgNumber}</span>
-                <VerifiedBadge checked={user.providerProfile.orgVerified} />
-                <form action={adminToggleVerifyAction}>
-                  <input type="hidden" name="profileId" value={user.providerProfile.id} />
-                  <input type="hidden" name="orgVerified" value={user.providerProfile.orgVerified ? "false" : "true"} />
-                  <button className="btn btn-secondary px-3 py-1 text-xs" type="submit">
-                    {user.providerProfile.orgVerified ? "Fjern merke" : "Merk org.nr format OK"}
-                  </button>
-                </form>
+              <div className="mt-2 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>{user.providerProfile.companyName} · {user.providerProfile.orgNumber}</span>
+                  <OrgBadgeList profile={user.providerProfile} />
+                </div>
+                {user.providerProfile.orgRegisterName ? (
+                  <p className="text-xs text-ink-soft">
+                    Enhetsregisteret: {user.providerProfile.orgRegisterName}
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  <form action={adminToggleVerifyAction}>
+                    <input type="hidden" name="profileId" value={user.providerProfile.id} />
+                    <input type="hidden" name="orgVerified" value={user.providerProfile.orgVerified ? "false" : "true"} />
+                    <button className="btn btn-secondary px-3 py-1 text-xs" type="submit">
+                      {user.providerProfile.orgVerified ? "Fjern formatmerke" : "Merk org.nr format OK"}
+                    </button>
+                  </form>
+                  <form action={adminLookupOrgAction}>
+                    <input type="hidden" name="profileId" value={user.providerProfile.id} />
+                    <button className="btn btn-secondary px-3 py-1 text-xs" type="submit">
+                      Slå opp i Enhetsregisteret
+                    </button>
+                  </form>
+                  <form action={adminToggleRepConfirmedAction}>
+                    <input type="hidden" name="profileId" value={user.providerProfile.id} />
+                    <input
+                      type="hidden"
+                      name="orgRepConfirmed"
+                      value={user.providerProfile.orgRepConfirmed ? "false" : "true"}
+                    />
+                    <button className="btn btn-secondary px-3 py-1 text-xs" type="submit">
+                      {user.providerProfile.orgRepConfirmed ? "Fjern signaturrett" : "Bekreft signaturrett"}
+                    </button>
+                  </form>
+                </div>
               </div>
             ) : null}
           </div>

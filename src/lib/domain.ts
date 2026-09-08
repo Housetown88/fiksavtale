@@ -5,8 +5,14 @@ import { isValidOrgNumber, normalizeOrgNumber } from "./orgnr";
 import { getPlatformFeeBps } from "./settings";
 import { AuthzError, type Viewer } from "./authz";
 import { parseBudgetRange } from "./budget";
-import { hashSessionToken, randomToken } from "./crypto";
+import { hashSessionToken, randomToken, sha256 } from "./crypto";
 import bcrypt from "bcryptjs";
+import { lookupOrgInBrreg } from "./brreg";
+import { sendPasswordResetEmail } from "./email";
+import { hitRateLimit } from "./rate-limit";
+import { LEDGER, postLedger } from "./ledger";
+import { refundBooking } from "./payments";
+import { summarizeBookingMoney } from "./booking-totals";
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
@@ -77,6 +83,7 @@ export async function registerUser(
                 companyName: input.companyName!,
                 orgNumber: normalizeOrgNumber(input.orgNumber!),
                 orgVerified: true,
+                orgRegisterStatus: "NOT_CHECKED",
                 about: input.about ?? null,
                 serviceAreas: input.serviceAreas ?? null,
                 invoiceEmail: email,
@@ -85,6 +92,23 @@ export async function registerUser(
           : undefined,
     },
   });
+  if (
+    input.role === "PROVIDER" &&
+    input.orgNumber &&
+    input.companyName &&
+    process.env.VITEST !== "true" &&
+    process.env.BRREG_LOOKUP !== "0"
+  ) {
+    const lookup = await lookupOrgInBrreg(input.orgNumber, input.companyName);
+    await db.providerProfile.update({
+      where: { userId: user.id },
+      data: {
+        orgRegisterStatus: lookup.status,
+        orgRegisterName: lookup.registerName,
+        orgLookupAt: new Date(),
+      },
+    });
+  }
   return user;
 }
 
@@ -349,6 +373,13 @@ export async function acceptOffer(
   const { platformFeeOre, providerPayoutOre } = calcCommission(offer.amountOre, platformFeeBps);
 
   const booking = await db.$transaction(async (tx) => {
+    const locked = await tx.job.updateMany({
+      where: { id: offer.jobId, status: "OPEN" },
+      data: { status: "OFFER_ACCEPTED" },
+    });
+    if (locked.count !== 1) {
+      throw new Error("Tilbudet kan ikke godtas nå.");
+    }
     await tx.offer.update({
       where: { id: offer.id },
       data: { status: "ACCEPTED" },
@@ -356,10 +387,6 @@ export async function acceptOffer(
     await tx.offer.updateMany({
       where: { jobId: offer.jobId, id: { not: offer.id }, status: "PENDING" },
       data: { status: "REJECTED" },
-    });
-    await tx.job.update({
-      where: { id: offer.jobId },
-      data: { status: "OFFER_ACCEPTED" },
     });
     return tx.booking.create({
       data: {
@@ -419,9 +446,19 @@ export async function completeBooking(db: PrismaClient, viewer: Viewer, bookingI
       data: { status: "REJECTED" },
     });
     await tx.job.update({ where: { id: booking.jobId }, data: { status: "COMPLETED" } });
+    const money = summarizeBookingMoney(booking.amountOre, booking.extras, booking.platformFeeBps, {
+      refundedOre: booking.refundedOre,
+    });
+    await postLedger(tx, {
+      bookingId: booking.id,
+      type: LEDGER.PAYOUT_ACCRUAL,
+      amountOre: money.settlementAfterRefundOre,
+      eventId: `payout_${booking.id}`,
+      note: "Oppgjør til firma etter kundegodkjenning. DEMO: ingen ekte utbetaling.",
+    });
     return tx.booking.update({
       where: { id: booking.id },
-      data: { status: "COMPLETED", completedAt: new Date() },
+      data: { status: "COMPLETED", completedAt: new Date(), payoutReleasedAt: new Date() },
     });
   });
 }
@@ -529,7 +566,10 @@ export async function cancelBooking(
   bookingId: string,
   reason: string,
 ) {
-  const booking = await db.booking.findUnique({ where: { id: bookingId } });
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    include: { extras: true, payments: true },
+  });
   if (!booking) throw new AuthzError("Bookingen finnes ikke", 404);
   if (
     viewer.role !== "ADMIN" &&
@@ -538,9 +578,54 @@ export async function cancelBooking(
   ) {
     throw new AuthzError("Du kan ikke avbestille denne bookingen", 403);
   }
-  if (["COMPLETED", "REFUNDED", "CANCELLED"].includes(booking.status)) {
+  if (["COMPLETED", "REFUNDED", "CANCELLED", "DISPUTED"].includes(booking.status)) {
     throw new Error("Bookingen kan ikke avbestilles i denne tilstanden.");
   }
+  if (booking.status === "IN_PROGRESS" || booking.workStartedAt) {
+    return db.$transaction(async (tx) => {
+      await tx.job.update({ where: { id: booking.jobId }, data: { status: "DISPUTED" } });
+      await postLedger(tx, {
+        bookingId: booking.id,
+        type: LEDGER.DISPUTE_HOLD,
+        amountOre: summarizeBookingMoney(booking.amountOre, booking.extras, booking.platformFeeBps).fundedOre,
+        eventId: `dispute_${booking.id}`,
+        note: "Avbestilling etter start åpner tvist. Oppgjør holdes.",
+      });
+      return tx.booking.update({
+        where: { id: booking.id },
+        data: {
+          status: "DISPUTED",
+          cancelledAt: new Date(),
+          cancelReason: reason,
+        },
+      });
+    });
+  }
+
+  const funded = booking.payments.some((payment) => payment.status === "SUCCEEDED");
+  if (funded && booking.status === "PAID") {
+    const money = summarizeBookingMoney(booking.amountOre, booking.extras, booking.platformFeeBps, {
+      refundedOre: booking.refundedOre,
+    });
+    const remaining = Math.max(0, money.fundedOre - booking.refundedOre);
+    if (remaining > 0) {
+      await refundBooking(db, booking.id, remaining, `cancel_refund_${booking.id}`);
+    }
+    await db.job.update({ where: { id: booking.jobId }, data: { status: "CANCELLED" } });
+    return db.booking.update({
+      where: { id: booking.id },
+      data: {
+        status: "REFUNDED",
+        cancelledAt: new Date(),
+        cancelReason: reason,
+      },
+    });
+  }
+
+  await db.paymentIntent.updateMany({
+    where: { bookingId: booking.id, status: "PENDING" },
+    data: { status: "EXPIRED" },
+  });
   return db.$transaction(async (tx) => {
     await tx.job.update({
       where: { id: booking.jobId },
@@ -557,9 +642,44 @@ export async function cancelBooking(
   });
 }
 
-export async function requestPasswordReset(db: PrismaClient, email: string) {
-  const user = await db.user.findUnique({ where: { email: email.trim().toLowerCase() } });
-  if (!user) return { created: false as const, token: null };
+export async function applyApprovalTimeout(db: PrismaClient, bookingId: string, now = new Date()) {
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    include: { extras: true },
+  });
+  if (!booking) throw new AuthzError("Bookingen finnes ikke", 404);
+  if (!booking.approvalDeadlineAt || booking.approvalDeadlineAt > now) {
+    throw new Error("Godkjenningsfristen er ikke utløpt.");
+  }
+  if (!["PAID", "IN_PROGRESS"].includes(booking.status)) {
+    throw new Error("Bookingen kan ikke auto-godkjennes i denne tilstanden.");
+  }
+  const unpaidApproved = booking.extras.filter((extra) => extra.status === "APPROVED");
+  if (unpaidApproved.length > 0) {
+    throw new Error("Godkjente tillegg må betales før auto-godkjenning.");
+  }
+  return completeBooking(db, { id: booking.customerId, role: "CUSTOMER" }, booking.id);
+}
+
+export async function requestPasswordReset(
+  db: PrismaClient,
+  email: string,
+  options?: { ip?: string | null },
+) {
+  const normalized = email.trim().toLowerCase();
+  const emailKey = `reset:email:${sha256(normalized)}`;
+  const emailLimit = await hitRateLimit(db, emailKey, 3, 60 * 60 * 1000);
+  if (!emailLimit.allowed) {
+    return { created: false as const, token: null, emailed: false, rateLimited: true };
+  }
+  if (options?.ip) {
+    const ipLimit = await hitRateLimit(db, `reset:ip:${sha256(options.ip)}`, 10, 60 * 60 * 1000);
+    if (!ipLimit.allowed) {
+      return { created: false as const, token: null, emailed: false, rateLimited: true };
+    }
+  }
+  const user = await db.user.findUnique({ where: { email: normalized } });
+  if (!user || user.deletedAt) return { created: false as const, token: null, emailed: false, rateLimited: false };
   await db.passwordResetToken.updateMany({
     where: { userId: user.id, usedAt: null },
     data: { usedAt: new Date() },
@@ -572,7 +692,8 @@ export async function requestPasswordReset(db: PrismaClient, email: string) {
       expiresAt: new Date(Date.now() + 60 * 60 * 1000),
     },
   });
-  return { created: true as const, token };
+  const emailed = await sendPasswordResetEmail({ to: user.email, token });
+  return { created: true as const, token, emailed: emailed.sent, rateLimited: false };
 }
 
 export async function resetPasswordWithToken(db: PrismaClient, token: string, password: string) {

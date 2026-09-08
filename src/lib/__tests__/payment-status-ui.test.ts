@@ -30,5 +30,7 @@ describe("betalingsstatus-tekst", () => {
     });
     expect(view.title).toMatch(/ikke ferdig/i);
     expect(view.showSimulate).toBe(true);
+    expect(view.nextAction).toBeTruthy();
+    expect(`${view.title} ${view.body} ${view.nextAction}`).not.toMatch(/webhook/i);
   });
 });

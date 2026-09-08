@@ -17,7 +17,8 @@ Prototypen er en Next.js App Router-app (TypeScript) med Prisma, øktbasert innl
 | `/oversikt` | Jobber, tilbud, utbetaling |
 | `/konto`, `/firma/[id]` | Profil / offentlig bedriftsside |
 | `/admin/*` | Brukere, oppdrag, betalinger, gebyr, rapporter, revisjonslogg |
-| `/vilkar`, `/personvern`, `/avbestilling`, `/verifisering`, `/kontakt` | Utkast, forbehold og enkel kontakt |
+| `/vilkar`, `/personvern`, `/avbestilling`, `/verifisering`, `/kontakt` | Produktutkast + personvernflyt |
+| `/admin/personvern` | Kø for innsyn/eksport/sletting |
 | `/milepaeler`, `/befaring` | Planlagte flyter (ikke bygget) |
 
 API (samme tilgangskontroll som UI):
@@ -42,7 +43,7 @@ Kjerneentiteter i `prisma/schema.prisma` (PostgreSQL). Lokalt SQLite: `prisma/sc
 - `PaymentIntent`, `Payment` (`eventId` unikt)
 - `Review` (kun fullførte bookinger)
 - `Report` (med behandlingsnotat), `AuditLog`, `PlatformSettings`, `ExtraCharge` (foreslått → godkjent → betalt)
-- `PasswordResetToken`, `ContactMessage`
+- `PasswordResetToken`, `ContactMessage`, `SettlementEntry`, `DataRequest`, `AuthThrottle`
 
 Beløp lagres i **øre**.
 
@@ -62,8 +63,11 @@ OPEN job
             -> contactUnlockedAt settes
   -> bedrift starter arbeid -> IN_PROGRESS
   -> kunde godkjenner -> COMPLETED (anmeldelse mulig)
-  -> avbestilling -> CANCELLED
+  -> avbestilling før finansiering -> CANCELLED
+  -> avbestilling etter finansiering, før start -> REFUNDED + provisjonsjustering
+  -> avbestilling etter start -> DISPUTED (oppgjør holdes)
   -> tillegg: PROPOSED -> APPROVED (ikke finansiert) -> DEMO-betaling -> PAID
+       -> CHARGE/COMMISSION i oppgjørsbok
 ```
 
 Idempotens: samme `eventId` returnerer forrige resultat uten ny booking eller endret utbetaling. Allerede betalt booking får ikke ny utbetalingsberegning.

@@ -4,6 +4,7 @@ import { categoryLabel } from "@/lib/categories";
 import { formatRelativeNb, initialsFromName } from "@/lib/format";
 import { formatNok } from "@/lib/money";
 import { statusLabelNb } from "@/lib/status-labels";
+import { orgBadges } from "@/lib/org-badges";
 
 export function PageTitle({
   kicker,
@@ -159,11 +160,11 @@ export function FeeBox({
       <p className="font-semibold">Prisoppsett (DEMO)</p>
       <dl className="mt-2 space-y-1">
         <div className="flex justify-between">
-          <dt>Avtalt pris</dt>
+          <dt>Opprinnelig jobbpris</dt>
           <dd>{formatNok(amountOre)}</dd>
         </div>
         <div className="flex justify-between">
-          <dt>Plattformgebyr (10 %)</dt>
+          <dt>Plattformgebyr (trekkes automatisk)</dt>
           <dd>{formatNok(feeOre)}</dd>
         </div>
         {audience === "customer" ? (
@@ -173,15 +174,78 @@ export function FeeBox({
           </div>
         ) : (
           <div className="flex justify-between font-semibold">
-            <dt>Etter faktura (illustrasjon)</dt>
+            <dt>Forventet oppgjør til firma</dt>
             <dd>{formatNok(payoutOre)}</dd>
           </div>
         )}
       </dl>
       <p className="mt-2 text-xs text-ink-soft">
         {audience === "customer"
-          ? "Du betaler jobbprisen. Gebyret gjelder firmaet og avregnes typisk via faktura — det trekkes ikke automatisk i DEMO. Planlagt: Vipps reserverer beløpet; trekket skjer ved godkjenning eller etter frist."
-          : "Gebyret avregnes typisk via faktura, ikke automatisk trukket fra Vipps-oppgjør ennå. Tallet «etter faktura» er bare en illustrasjon. Kortgebyr og MVA er ikke beregnet."}
+          ? "Du betaler jobbprisen. Plattformgebyret trekkes automatisk i betalingsløpet. DEMO: ingen ekte trekk."
+          : "Gebyret registreres automatisk når kunden finansierer jobben. Kortgebyr og MVA er ikke beregnet."}
+      </p>
+    </div>
+  );
+}
+
+export function PriceBreakdown({
+  view,
+  audience,
+}: {
+  view: import("@/lib/booking-totals").BookingMoneyView;
+  audience: "customer" | "provider" | "admin";
+}) {
+  return (
+    <div className="card p-4 text-sm">
+      <p className="font-semibold">{view.isHistorical ? "Prishistorikk (DEMO)" : "Prisoppsett (DEMO)"}</p>
+      <dl className="mt-2 space-y-1">
+        <div className="flex justify-between">
+          <dt>{view.originalJobLabel}</dt>
+          <dd>{formatNok(view.agreedOre)}</dd>
+        </div>
+        {view.extrasPaidOre > 0 ? (
+          <div className="flex justify-between">
+            <dt>Betalte tillegg</dt>
+            <dd>{formatNok(view.extrasPaidOre)}</dd>
+          </div>
+        ) : null}
+        {view.extrasApprovedUnpaidOre > 0 ? (
+          <div className="flex justify-between">
+            <dt>Godkjent, ikke betalt</dt>
+            <dd>{formatNok(view.extrasApprovedUnpaidOre)}</dd>
+          </div>
+        ) : null}
+        <div className="flex justify-between">
+          <dt>Plattformgebyr (automatisk)</dt>
+          <dd>{formatNok(view.feeAfterRefundOre)}</dd>
+        </div>
+        {audience === "customer" ? (
+          <div className="flex justify-between font-semibold">
+            <dt>{view.customerPayLabel}</dt>
+            <dd>{formatNok(view.agreedOre + view.extrasPaidOre)}</dd>
+          </div>
+        ) : (
+          <div className="flex justify-between font-semibold">
+            <dt>{view.providerPayoutLabel}</dt>
+            <dd>{formatNok(view.settlementAfterRefundOre)}</dd>
+          </div>
+        )}
+        {!view.isHistorical ? (
+          <div className="flex justify-between">
+            <dt>Gjenstår å betale</dt>
+            <dd>{formatNok(view.remainingToPayOre)}</dd>
+          </div>
+        ) : null}
+        {view.refundedOre > 0 ? (
+          <div className="flex justify-between">
+            <dt>Refundert</dt>
+            <dd>{formatNok(view.refundedOre)}</dd>
+          </div>
+        ) : null}
+      </dl>
+      {view.refundLabel ? <p className="mt-2 text-xs text-ink-soft">{view.refundLabel}</p> : null}
+      <p className="mt-2 text-xs text-ink-soft">
+        Provisjon registreres automatisk ved finansiering. DEMO: ingen ekte Vipps-trekk.
       </p>
     </div>
   );
@@ -192,7 +256,7 @@ export function VerifiedBadge({ checked }: { checked: boolean }) {
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full bg-moss/10 px-2 py-0.5 text-xs font-semibold text-pine"
-      title="Gyldig 9-sifret format og kontrollsiffer. Ikke Brønnøysund-oppslag."
+      title="Gyldig 9-sifret format og kontrollsiffer. Ikke det samme som Enhetsregister-oppslag."
     >
       <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden>
         <path
@@ -202,6 +266,38 @@ export function VerifiedBadge({ checked }: { checked: boolean }) {
       </svg>
       Org.nr format OK
     </span>
+  );
+}
+
+export function OrgBadgeList({
+  profile,
+}: {
+  profile: {
+    orgVerified: boolean;
+    orgRegisterStatus?: string | null;
+    orgRegisterName?: string | null;
+    orgRepConfirmed?: boolean | null;
+    tradeAuthChecked?: boolean | null;
+  };
+}) {
+  const badges = orgBadges(profile);
+  return (
+    <div className="flex flex-wrap gap-1">
+      {badges.map((badge) => (
+        <span
+          key={badge.key}
+          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+            badge.tone === "ok"
+              ? "bg-moss/10 text-pine"
+              : badge.tone === "warn"
+                ? "bg-copper/10 text-copper-deep"
+                : "bg-sand text-ink-soft"
+          }`}
+        >
+          {badge.label}
+        </span>
+      ))}
+    </div>
   );
 }
 
