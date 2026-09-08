@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { summarizeBookingMoney } from "@/lib/booking-totals";
+import { describeBookingMoney } from "@/lib/booking-totals";
 import { formatNok } from "@/lib/money";
 import { PageTitle, StatusBadge } from "@/components/ui";
 import { PlannedVippsProviderCopy } from "@/components/PaymentCopy";
@@ -37,12 +37,24 @@ export default async function OverviewPage() {
 
   const funded = bookings.filter((booking) => ["PAID", "IN_PROGRESS", "COMPLETED"].includes(booking.status));
   const agreed = funded.reduce((sum, booking) => {
-    const money = summarizeBookingMoney(booking.amountOre, booking.extras, booking.platformFeeBps);
-    return sum + money.fundedOre;
+    const money = describeBookingMoney({
+      agreedOre: booking.amountOre,
+      extras: booking.extras,
+      platformFeeBps: booking.platformFeeBps,
+      status: booking.status,
+      refundedOre: booking.refundedOre,
+    });
+    return sum + money.fundedOre - money.refundedOre;
   }, 0);
   const fees = funded.reduce((sum, booking) => {
-    const money = summarizeBookingMoney(booking.amountOre, booking.extras, booking.platformFeeBps);
-    return sum + money.feeOnFundedOre;
+    const money = describeBookingMoney({
+      agreedOre: booking.amountOre,
+      extras: booking.extras,
+      platformFeeBps: booking.platformFeeBps,
+      status: booking.status,
+      refundedOre: booking.refundedOre,
+    });
+    return sum + money.feeAfterRefundOre;
   }, 0);
 
   return (
@@ -66,11 +78,11 @@ export default async function OverviewPage() {
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="card p-4">
-              <p className="text-sm text-ink-soft">Avtalt pris (betalte jobber)</p>
+              <p className="text-sm text-ink-soft">Finansiert totalt (betalte jobber)</p>
               <p className="font-serif text-3xl">{formatNok(agreed)}</p>
             </div>
             <div className="card p-4">
-              <p className="text-sm text-ink-soft">Opptjent provisjon (avregnes via faktura)</p>
+              <p className="text-sm text-ink-soft">Provisjon registrert automatisk</p>
               <p className="font-serif text-3xl">{formatNok(fees)}</p>
             </div>
           </div>
@@ -80,17 +92,32 @@ export default async function OverviewPage() {
       <section>
         <h2 className="font-serif text-2xl">Bookinger</h2>
         <div className="mt-3 space-y-2">
-          {bookings.map((booking) => (
-            <Link key={booking.id} href={`/booking/${booking.id}`} className="card card-link flex items-center justify-between gap-3 p-4">
-              <div>
-                <p className="font-semibold">{booking.job.title}</p>
-                <p className="text-sm text-ink-soft">
-                  Avtalt {formatNok(booking.amountOre)} · provisjon {formatNok(booking.platformFeeOre)} (faktura)
-                </p>
-              </div>
-              <StatusBadge status={booking.status} />
-            </Link>
-          ))}
+          {bookings.map((booking) => {
+            const money = describeBookingMoney({
+              agreedOre: booking.amountOre,
+              extras: booking.extras,
+              platformFeeBps: booking.platformFeeBps,
+              status: booking.status,
+              refundedOre: booking.refundedOre,
+            });
+            return (
+              <Link key={booking.id} href={`/booking/${booking.id}`} className="card card-link flex items-center justify-between gap-3 p-4">
+                <div>
+                  <p className="font-semibold">{booking.job.title}</p>
+                  <p className="text-sm text-ink-soft">
+                    {money.isHistorical ? "Historisk " : ""}
+                    jobb {formatNok(money.agreedOre)}
+                    {money.extrasPaidOre > 0 ? ` + tillegg ${formatNok(money.extrasPaidOre)}` : ""}
+                    {money.extrasApprovedUnpaidOre > 0
+                      ? ` · gjenstår ${formatNok(money.remainingToPayOre)}`
+                      : ""}{" "}
+                    · gebyr {formatNok(money.feeAfterRefundOre)}
+                  </p>
+                </div>
+                <StatusBadge status={booking.status} />
+              </Link>
+            );
+          })}
           {bookings.length === 0 ? <p className="text-sm text-ink-soft">Ingen bookinger ennå.</p> : null}
         </div>
       </section>

@@ -59,6 +59,17 @@ export function assertStrongAdminPassword(password: string): void {
   }
 }
 
+/** DEMO-webhook kan aldri låse opp ekte kundedata i produksjon. */
+export function demoPaymentsAllowed(): boolean {
+  if (flagOn("ALLOW_DEMO_PAYMENTS")) return true;
+  return !isProductionRuntime();
+}
+
+export function canUnlockViaDemoPayment(customerEmail: string): boolean {
+  if (!isProductionRuntime()) return true;
+  return demoPaymentsAllowed() && isKnownDemoEmail(customerEmail);
+}
+
 export function bootstrapAdminCredentials(): { email: string; password: string } | null {
   const email = (process.env.ADMIN_BOOTSTRAP_EMAIL ?? "").trim().toLowerCase();
   const password = process.env.ADMIN_BOOTSTRAP_PASSWORD ?? "";

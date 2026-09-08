@@ -3,11 +3,13 @@ import {
   adminDemoAllowed,
   allowDemoHints,
   assertStrongAdminPassword,
+  canUnlockViaDemoPayment,
+  demoPaymentsAllowed,
   isKnownDemoEmail,
   isProductionRuntime,
 } from "../demo-mode";
 
-const keys = ["NODE_ENV", "VERCEL_ENV", "ALLOW_DEMO_HINTS", "DEMO", "ADMIN_DEMO_ALLOWED"] as const;
+const keys = ["NODE_ENV", "VERCEL_ENV", "ALLOW_DEMO_HINTS", "DEMO", "ADMIN_DEMO_ALLOWED", "ALLOW_DEMO_PAYMENTS"] as const;
 const snapshot = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 
 afterEach(() => {
@@ -39,6 +41,14 @@ describe("demo-modus", () => {
   it("kjenner igjen demo-e-poster", () => {
     expect(isKnownDemoEmail("kari@demo.jobbenmin.no")).toBe(true);
     expect(isKnownDemoEmail("anne@firma.no")).toBe(false);
+  });
+
+  it("blokkerer DEMO-opplåsing av ekte kunder i produksjon", () => {
+    process.env.VERCEL_ENV = "production";
+    delete process.env.ALLOW_DEMO_PAYMENTS;
+    expect(demoPaymentsAllowed()).toBe(false);
+    expect(canUnlockViaDemoPayment("kari@kunde.no")).toBe(false);
+    expect(canUnlockViaDemoPayment("kari@demo.jobbenmin.no")).toBe(false);
   });
 
   it("avviser svakt admin-passord", () => {

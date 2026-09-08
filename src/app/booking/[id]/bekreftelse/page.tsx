@@ -74,6 +74,7 @@ export default async function PaymentConfirmPage({
         ) : (
           <Alert tone={view.tone === "warn" ? "warn" : "info"}>{view.body}</Alert>
         )}
+        <p className="text-sm">{view.nextAction}</p>
         {view.showSimulate && intent && booking.status === "PENDING_PAYMENT" && !extraCharge ? (
           <div className="flex flex-wrap gap-2">
             <form action={simulateWebhookAction}>
@@ -133,10 +134,7 @@ export default async function PaymentConfirmPage({
             </button>
           </form>
         ) : null}
-        <p className="text-xs text-ink-soft">
-          Admin ser tekniske koder. For deg: bekreftet, feilet eller avbrutt. Ingen webhook-ord i
-          kundeteksten.
-        </p>
+        <p className="text-xs text-ink-soft">DEMO — ingen ekte Vipps-trekk.</p>
         <Link href={`/booking/${booking.id}`} className="btn btn-secondary">
           Til bookingen
         </Link>

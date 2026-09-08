@@ -50,6 +50,7 @@ enum PaymentStatus {
   SUCCEEDED
   FAILED
   CANCELLED
+  EXPIRED
 }
 
 enum ReportStatus {
@@ -91,6 +92,8 @@ model User {
   reportsAbout    Report[] @relation("ReportsAbout")
   auditLogs       AuditLog[]
   passwordResetTokens PasswordResetToken[]
+  dataRequests    DataRequest[]
+  deletedAt       DateTime?
 }
 
 model Session {
@@ -113,15 +116,20 @@ model CustomerProfile {
 }
 
 model ProviderProfile {
-  id            String  @id @default(cuid())
-  userId        String  @unique
-  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companyName   String
-  orgNumber     String
-  orgVerified   Boolean @default(false)
-  about         String?
-  serviceAreas  String?
-  invoiceEmail  String?
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName        String
+  orgNumber          String
+  orgVerified        Boolean   @default(false)
+  orgRegisterStatus  String    @default("NOT_CHECKED")
+  orgRegisterName    String?
+  orgLookupAt        DateTime?
+  orgRepConfirmed    Boolean   @default(false)
+  tradeAuthChecked   Boolean   @default(false)
+  about              String?
+  serviceAreas       String?
+  invoiceEmail       String?
 }
 
 model Job {
@@ -224,14 +232,18 @@ model Booking {
   contactUnlockedAt DateTime?
   workStartedAt     DateTime?
   completedAt       DateTime?
-  cancelledAt       DateTime?
-  cancelReason      String?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  cancelledAt         DateTime?
+  cancelReason        String?
+  refundedOre         Int           @default(0)
+  payoutReleasedAt    DateTime?
+  approvalDeadlineAt  DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
   payments     Payment[]
   review       Review?
   extras       ExtraCharge[]
+  ledger       SettlementEntry[]
 }
 
 model Payment {
@@ -255,6 +267,8 @@ model PaymentIntent {
   extraCharge   ExtraCharge?  @relation(fields: [extraChargeId], references: [id])
   amountOre     Int
   status        PaymentStatus @default(PENDING)
+  kind          String        @default("RESERVATION")
+  expiresAt     DateTime?
   createdAt     DateTime      @default(now())
 }
 
@@ -330,4 +344,39 @@ model PlatformSettings {
   id              String @id @default("default")
   platformFeeBps  Int    @default(1000)
   updatedAt       DateTime @updatedAt
+}
+
+model SettlementEntry {
+  id            String   @id @default(cuid())
+  bookingId     String
+  booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  extraChargeId String?
+  paymentId     String?
+  type          String
+  amountOre     Int
+  eventId       String?  @unique
+  note          String?
+  createdAt     DateTime @default(now())
+
+  @@index([bookingId, type])
+}
+
+model DataRequest {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String
+  status     String    @default("OPEN")
+  message    String?
+  adminNote  String?
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+}
+
+model AuthThrottle {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
 }

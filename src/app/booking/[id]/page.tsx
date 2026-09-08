@@ -10,10 +10,10 @@ import {
   startDemoPaymentAction,
   startWorkAction,
 } from "@/app/actions";
-import { Alert, FeeBox, PageTitle, StatusBadge } from "@/components/ui";
+import { Alert, PageTitle, PriceBreakdown, StatusBadge } from "@/components/ui";
 import { CancelForm, ExtraForm, ReviewForm } from "@/components/forms";
 import { CheckoutPaymentCopy, PlannedVippsProviderCopy } from "@/components/PaymentCopy";
-import { extraImpact, summarizeBookingMoney } from "@/lib/booking-totals";
+import { describeBookingMoney, extraImpact } from "@/lib/booking-totals";
 import { formatNok } from "@/lib/money";
 import { statusLabelNb } from "@/lib/status-labels";
 
@@ -34,7 +34,13 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const isCancelled = booking.status === "CANCELLED";
   const isCustomer = user.id === booking.customerId;
   const isProvider = user.id === booking.providerId;
-  const money = summarizeBookingMoney(booking.amountOre, extras, booking.platformFeeBps);
+  const money = describeBookingMoney({
+    agreedOre: booking.amountOre,
+    extras,
+    platformFeeBps: booking.platformFeeBps,
+    status: booking.status,
+    refundedOre: booking.refundedOre,
+  });
   const succeededPayment = booking.payments.some((payment) => payment.status === "SUCCEEDED");
 
   return (
@@ -50,45 +56,20 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           </Alert>
         ) : null}
         <div className="mt-3">
-          <FeeBox
-            amountOre={money.agreedOre}
-            feeOre={booking.platformFeeOre}
-            payoutOre={booking.providerPayoutOre}
-            audience={isProvider ? "provider" : "customer"}
-          />
+          <PriceBreakdown view={money} audience={isProvider ? "provider" : "customer"} />
         </div>
-        {money.extrasPaidOre > 0 || money.extrasApprovedUnpaidOre > 0 ? (
-          <div className="card mt-3 p-4 text-sm">
-            <p className="font-semibold">Samlet oversikt</p>
-            <p>Avtalt jobbpris: {formatNok(money.agreedOre)}</p>
-            {money.extrasPaidOre > 0 ? <p>Betalte tillegg: {formatNok(money.extrasPaidOre)}</p> : null}
-            {money.extrasApprovedUnpaidOre > 0 ? (
-              <p>Godkjent, ikke betalt: {formatNok(money.extrasApprovedUnpaidOre)}</p>
-            ) : null}
-            <p className="font-semibold">
-              Finansiert totalt: {formatNok(money.fundedOre)}
-            </p>
-            <p className="text-xs text-ink-soft">
-              Opptjent provisjon på finansiert beløp: {formatNok(money.feeOnFundedOre)} (avregnes typisk via
-              faktura).
-            </p>
-          </div>
-        ) : null}
         {isCancelled ? (
           <div className="card mt-3 space-y-2 p-4 text-sm">
             <p>
-              Historisk avtalt sum: <strong>{formatNok(booking.amountOre)}</strong>
+              Historisk avtalt jobbpris: <strong>{formatNok(booking.amountOre)}</strong>
+              {money.extrasPaidOre > 0 ? ` · betalte tillegg ${formatNok(money.extrasPaidOre)}` : ""}
             </p>
-            {succeededPayment ? (
+            {succeededPayment || money.refundedOre > 0 ? (
               <p>
-                Bookingen var merket betalt i DEMO. Ekte refusjon er ikke koblet —{" "}
-                <Link href="/kontakt" className="underline">
-                  kontakt eier
-                </Link>{" "}
-                hvis dere trenger oppfølging.
+                {money.refundLabel} DEMO-refusjon er en post i oppgjørsboken, ikke et ekte Vipps-tilbake.
               </p>
             ) : (
-              <p>Ingenting gjenstår å betale. Ingen penger er i bevegelse i DEMO.</p>
+              <p>Ingenting gjenstår å betale. Ingen penger ble finansiert.</p>
             )}
             {booking.cancelReason ? <p>Grunn: {booking.cancelReason}</p> : null}
           </div>
@@ -185,8 +166,8 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
                       <p className="font-semibold">{extra.title}</p>
                       <p>Pris: {formatNok(extra.amountOre)}</p>
                       <p className="text-xs text-ink-soft">
-                        Gebyr på tillegget: {formatNok(impact.extraFeeOre)} (faktureres typisk). Ny samlet
-                        totalt hvis finansiert: {formatNok(impact.combinedOre)}.
+                        Gebyr på tillegget: {formatNok(impact.extraFeeOre)} (trekkes automatisk ved
+                        betaling). Ny samlet totalt hvis finansiert: {formatNok(impact.combinedOre)}.
                       </p>
                     </div>
                     <StatusBadge status={extra.status} />

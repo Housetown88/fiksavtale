@@ -11,6 +11,7 @@ import {
   loginAction,
   registerAction,
   reportAction,
+  requestDataAction,
   requestPasswordResetAction,
   resetPasswordAction,
   reviewAction,
@@ -94,16 +95,8 @@ export function ForgotPasswordForm() {
       <ErrorBox state={state} />
       {state?.ok ? (
         <Alert tone="ok">
-          Hvis kontoen finnes, kan passordet tilbakestilles. E-postutsendelse er ikke satt opp ennå — bruk
-          kontaktskjemaet, eller be eier om hjelp.
-          {state.resetLink ? (
-            <p className="mt-2">
-              DEMO-lenke:{" "}
-              <Link href={state.resetLink} className="font-semibold underline">
-                Tilbakestill passord
-              </Link>
-            </p>
-          ) : null}
+          Hvis kontoen finnes, sender vi en e-post med en tidsbegrenset lenke. Sjekk innboksen. Vi
+          bekrefter ikke om e-postadressen er registrert.
         </Alert>
       ) : null}
       <Field id="reset-email" label="E-post">
@@ -386,7 +379,7 @@ export function OfferForm({
           audience="provider"
         />
       ) : (
-        <p className="text-xs text-ink-soft">Skriv inn pris for å se gebyr og illustrasjon etter faktura.</p>
+        <p className="text-xs text-ink-soft">Skriv inn pris for å se gebyr og forventet oppgjør.</p>
       )}
       <button className="btn btn-copper" disabled={pending} type="submit">
         {pending ? "Sender…" : "Gi tilbud"}
@@ -567,6 +560,32 @@ export function ProfileForm({
       ) : null}
       <button className="btn btn-primary" disabled={pending} type="submit">
         {pending ? "Lagrer…" : "Lagre profil"}
+      </button>
+    </form>
+  );
+}
+
+export function DataRequestForm() {
+  const [state, action, pending] = useActionState(requestDataAction, {});
+  return (
+    <form action={action} className="grid gap-3">
+      <ErrorBox state={state} />
+      {state?.ok ? <Alert tone="ok">Forespørselen er registrert. Admin behandler køen.</Alert> : null}
+      <Field id="data-request-type" label="Type">
+        <select className="field" id="data-request-type" name="type" required>
+          <option value="ACCESS">Innsyn</option>
+          <option value="EXPORT">Eksport</option>
+          <option value="DELETION">Sletting / anonymisering</option>
+        </select>
+      </Field>
+      <Field id="data-request-message" label="Begrunnelse (valgfritt)">
+        <textarea className="field min-h-20" id="data-request-message" name="message" />
+      </Field>
+      <p className="text-xs text-ink-soft">
+        Sletting anonymiserer profil og chat. Beløp, provisjon og tviststatus beholdes for regnskap.
+      </p>
+      <button className="btn btn-primary" disabled={pending} type="submit">
+        {pending ? "Sender…" : "Send forespørsel"}
       </button>
     </form>
   );

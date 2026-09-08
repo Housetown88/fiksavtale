@@ -21,6 +21,9 @@ import {
 } from "./demo-mode";
 
 export async function resetDemoData(db: PrismaClient) {
+  await db.settlementEntry.deleteMany();
+  await db.dataRequest.deleteMany();
+  await db.authThrottle.deleteMany();
   await db.payment.deleteMany();
   await db.paymentIntent.deleteMany();
   await db.review.deleteMany();

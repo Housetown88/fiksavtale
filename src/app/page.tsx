@@ -148,7 +148,7 @@ export default async function HomePage() {
           {[
             ["For bedrifter: Finn oppdrag", "Se åpne jobber i Oslo og filtrer på fag."],
             ["Gi tilbud", "Kunden ser totalen. Dere ser gebyr før dere sender."],
-            ["Gjør jobben", "Kontakt deles når bookingen er betalt. Oppgjør via Vipps er planlagt."],
+            ["Gjør jobben", "Kontakt deles når bookingen er finansiert. Provisjon registreres automatisk."],
           ].map(([title, body]) => (
             <div key={title} className="rounded-[var(--radius-lg)] border border-line/80 bg-sand/40 p-5">
               <h3 className="font-semibold">{title}</h3>

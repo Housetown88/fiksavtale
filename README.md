@@ -56,6 +56,10 @@ SQLite-fil virker **ikke** på Vercel serverless. Sett en ekstern database:
 | `ADMIN_DEMO_ALLOWED` | Nei | `1` = tillat `admin@demo` med svakt passord. **Standard av i produksjon.** |
 | `ADMIN_BOOTSTRAP_EMAIL` + `ADMIN_BOOTSTRAP_PASSWORD` | Anbefalt i prod | Oppretter én sterk admin hvis e-posten mangler. Minst 16 tegn. Ikke `Demo1234!`. |
 | `CONTACT_EMAIL` | Nei | Vises på /kontakt. |
+| `RESEND_API_KEY` | For e-post | Resend TEST/live-nøkkel. Uten nøkkel sendes ikke reset-e-post. |
+| `EMAIL_FROM` | For e-post | Avsender, f.eks. `Jobbenmin <ikke-svar@ditt-domene.no>`. |
+| `APP_BASE_URL` | Anbefalt | Basis-URL i reset-lenker. |
+| `ALLOW_DEMO_PAYMENTS` | Nei | `1` = tillat DEMO-opplåsing i produksjon. **Standard av.** |
 
 Prisma-klienten opprettes **ikke** ved import. Mangler eller fil-SQLite `DATABASE_URL` på Vercel gir en norsk statusmelding på forsiden — ikke en hard 500.
 
@@ -94,15 +98,16 @@ Delt passord (`Demo1234!`) vises **ikke** på /logg-inn i produksjon. Sett `ALLO
 ## Forretningsmodell
 
 - Gratis å registrere, legge ut oppdrag og gi tilbud.
-- Plattformen tar et konfigurerbart gebyr (standard **10 %**, 1000 basispunkter) bare av **betalte** jobber.
-- Eksempel: 5 000 NOK jobb → kunden betaler 5 000. 500 NOK er opptjent provisjon som avregnes typisk via faktura — ikke automatisk trukket fra Vipps ennå.
+- Plattformen tar et konfigurerbart gebyr (standard **10 %**, 1000 basispunkter) av **finansierte** jobber.
+- Eksempel: 5 000 NOK jobb → kunden betaler 5 000. 500 NOK registreres automatisk som provisjon i oppgjørsboken. Firmaet ser 4 500 NOK som forventet oppgjør.
+- **Anbefalt live-løsning (ikke live):** Jobbenmin som én Vipps-selger (single-merchant). Kunden betaler plattformen. Provisjon tas i samme løp. Firmaet får oppgjør etter godkjenning. [Vipps støtter ikke gebyrsplitt](https://developer.vippsmobilepay.com/docs/knowledge-base/merchant-info/) i selve betalingen. Standard reservasjon alene dekker ikke markedsplassmodellen.
 
 **Antakelser (ikke regnskapssannhet):**
 
 - Beløp er inkl. avtalt fastpris, lagret i øre.
 - Kortgebyr, utbetalingsgebyr og MVA er **ikke** beregnet.
-- Plattformen holder **ikke** kundens penger i depot (ingen escrow).
-- DEMO simulerer bekreftelse → opplåsing. Vipps reserve/capture er ikke live.
+- DEMO-oppgjørsbok er intern bokføring, ikke ekte midler. Live mottak av kunders penger kan kreve tillatelse.
+- Vipps reserve/capture og utbetaling til firma er **ikke** live.
 
 ## Betaling (DEMO)
 
@@ -110,9 +115,10 @@ Delt passord (`Demo1234!`) vises **ikke** på /logg-inn i produksjon. Sett `ALLO
 2. «Start DEMO-betaling» lager en betalingsintensjon og sender deg til en bekreftelsesside.
 3. Bekreftelsessiden **låser ikke opp kontakt**.
 4. Først når en signert webhook `payment.succeeded` behandles på serveren, settes `contactUnlockedAt`.
-5. `payment.failed` / `payment.cancelled` låser ikke opp. Samme `eventId` gir idempotent svar.
+5. `payment.failed` / `payment.cancelled` / utløpt reservasjon låser ikke opp. Samme `eventId` gir idempotent svar.
+6. Ved suksess postres CHARGE + COMMISSION i oppgjørsboken. Refusjon justerer provisjonen.
 
-Ekte Stripe Connect, PSD2 og utbetalingsoppsett må verifiseres med advokat og betalingspartner før produksjon.
+Ekte Vipps-avtale, nøkler og eventuell tillatelse til å motta midler må avklares før produksjon.
 
 ## Sikkerhet i MVP
 
@@ -126,17 +132,16 @@ Ekte Stripe Connect, PSD2 og utbetalingsoppsett må verifiseres med advokat og b
 
 Tekst om vilkår, personvern, avbestilling og merker er **produktutkast**, ikke juridiske fakta. Avklar GDPR, forbrukerrett, håndverkertjenester og betalingsregulering med advokat. Forretningsidentitet vises tidlig; direkte kontakt og gateadresse først etter betalt booking.
 
-Merket **«Org.nr format OK»** betyr format + kontrollsiffer i DEMO. Det er ikke et oppslag i Brønnøysund eller faglig godkjenning.
+Merkene skiller format, Enhetsregister-oppslag, signaturrett og faglig godkjenning. Bare det som faktisk er sjekket vises som sjekket.
 
 ## Hva som ikke er ferdig
 
-- Ekte betaling, KYC, BankID og Brønnøysund-oppslag
-- Escrow / holding av kundemidler
+- Ekte Vipps-avtale, TEST/prod-nøkler og utbetaling til firma
+- Avklaring om tillatelse til å motta kunders penger (single-merchant)
+- Juridisk godkjenning av vilkår/personvern og firmanavn/org.nr
+- Resend-nøkkel i miljøet (integrasjonen er koblet, sending er ikke verifisert uten nøkkel)
 - Milepælsbetaling og befaring (egne stubsider)
-- Ekte Vipps merchant-integrasjon (DEMO-tillegg finnes)
-- Automatisk refusjon og tvistenemnd
-- GDPR-innsyn/sletting, e-postvarsler, chat-filvedlegg
 - OCR / visuell kontaktfiltrering av oppdragsbilder
-- Produksjonshosting, rate limiting og pentest
+- Pentest og produksjonsrate-limit utenfor reset-flyten
 
 Se [ARCHITECTURE.md](./ARCHITECTURE.md) for sider, datamodell og tilstandsmaskin.

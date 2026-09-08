@@ -21,6 +21,9 @@ const LABELS: Record<string, string> = {
   DISMISSED: "Avvist",
   WITHDRAWN: "Trukket",
   EXPIRED: "Utløpt",
+  ACCESS: "Innsyn",
+  EXPORT: "Eksport",
+  DELETION: "Sletting",
 };
 
 export function statusLabelNb(status: string): string {
