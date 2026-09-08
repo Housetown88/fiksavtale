@@ -160,7 +160,7 @@ export function FeeBox({
       <p className="font-semibold">Prisoppsett (DEMO)</p>
       <dl className="mt-2 space-y-1">
         <div className="flex justify-between">
-          <dt>Avtalt jobbpris</dt>
+          <dt>Opprinnelig jobbpris</dt>
           <dd>{formatNok(amountOre)}</dd>
         </div>
         <div className="flex justify-between">
@@ -181,8 +181,8 @@ export function FeeBox({
       </dl>
       <p className="mt-2 text-xs text-ink-soft">
         {audience === "customer"
-          ? "Du betaler jobbprisen. Plattformgebyret trekkes automatisk i betalingsløpet og vises til firmaet som forventet oppgjør. DEMO: ingen ekte trekk."
-          : "Gebyret registreres automatisk når kunden finansierer jobben. Tallet er forventet oppgjør etter provisjon, ikke en faktura i etterkant. Kortgebyr og MVA er ikke beregnet."}
+          ? "Du betaler jobbprisen. Plattformgebyret trekkes automatisk i betalingsløpet. DEMO: ingen ekte trekk."
+          : "Gebyret registreres automatisk når kunden finansierer jobben. Kortgebyr og MVA er ikke beregnet."}
       </p>
     </div>
   );
@@ -200,7 +200,7 @@ export function PriceBreakdown({
       <p className="font-semibold">{view.isHistorical ? "Prishistorikk (DEMO)" : "Prisoppsett (DEMO)"}</p>
       <dl className="mt-2 space-y-1">
         <div className="flex justify-between">
-          <dt>Avtalt jobbpris</dt>
+          <dt>{view.originalJobLabel}</dt>
           <dd>{formatNok(view.agreedOre)}</dd>
         </div>
         {view.extrasPaidOre > 0 ? (
@@ -215,10 +215,6 @@ export function PriceBreakdown({
             <dd>{formatNok(view.extrasApprovedUnpaidOre)}</dd>
           </div>
         ) : null}
-        <div className="flex justify-between">
-          <dt>Samlet finansiert</dt>
-          <dd>{formatNok(view.fundedOre)}</dd>
-        </div>
         <div className="flex justify-between">
           <dt>Plattformgebyr (automatisk)</dt>
           <dd>{formatNok(view.feeAfterRefundOre)}</dd>

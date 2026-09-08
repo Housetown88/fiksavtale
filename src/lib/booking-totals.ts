@@ -27,6 +27,7 @@ export type BookingMoneyView = BookingMoneySummary & {
   isHistorical: boolean;
   customerPayLabel: string;
   providerPayoutLabel: string;
+  originalJobLabel: string;
   refundLabel: string | null;
 };
 
@@ -108,7 +109,12 @@ export function describeBookingMoney(input: {
     isCancelled,
     isRefunded,
     isHistorical,
-    customerPayLabel: isHistorical ? "Historisk avtalt pris" : "Du betaler",
+    originalJobLabel: "Opprinnelig jobbpris",
+    customerPayLabel: isHistorical
+      ? "Historisk avtalesum"
+      : summary.extrasPaidOre > 0
+        ? "Totalt inkl. betalte tillegg"
+        : "Du betaler",
     providerPayoutLabel: isHistorical ? "Historisk forventet oppgjør" : "Forventet oppgjør til firma",
     refundLabel,
   };

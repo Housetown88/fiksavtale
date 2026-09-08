@@ -23,8 +23,8 @@ export default function TermsPage() {
       <p>
         Kunden betaler den avtalte jobbprisen (pluss eventuelle betalte tillegg). Jobbenmin tjener en
         konfigurerbar provisjon (standard 10 %) av beløp som finansieres gjennom plattformen.
-        Provisjonen registreres automatisk i oppgjørsboken når betalingen bekreftes — ikke som en
-        faktura i etterkant. Kunden ser totalen. Firmaet ser gebyr og forventet oppgjør.
+        Provisjonen registreres automatisk i oppgjørsboken når betalingen bekreftes. Kunden ser
+        totalen. Firmaet ser gebyr og forventet oppgjør. Gebyret faktureres ikke i etterkant.
       </p>
       <h2 className="font-serif text-xl">3. Betaling og kontakt</h2>
       <p>

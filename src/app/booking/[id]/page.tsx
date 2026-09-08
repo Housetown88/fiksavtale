@@ -52,7 +52,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         {isCancelled ? (
           <Alert tone="warn">
             Bookingen er avbestilt. Tilbudet som ble valgt står fortsatt som godtatt i historikken — det er
-            ikke en aktiv avtale. Avtalt sum under er historikk.
+            ikke en aktiv avtale. Summene under er historikk, ikke et betalingskrav.
           </Alert>
         ) : null}
         <div className="mt-3">
@@ -61,8 +61,10 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         {isCancelled ? (
           <div className="card mt-3 space-y-2 p-4 text-sm">
             <p>
-              Historisk avtalt jobbpris: <strong>{formatNok(booking.amountOre)}</strong>
-              {money.extrasPaidOre > 0 ? ` · betalte tillegg ${formatNok(money.extrasPaidOre)}` : ""}
+              Historisk avtalesum: <strong>{formatNok(money.agreedOre + money.extrasPaidOre)}</strong>
+              {money.extrasPaidOre > 0
+                ? ` (opprinnelig jobbpris ${formatNok(money.agreedOre)} + betalte tillegg ${formatNok(money.extrasPaidOre)})`
+                : ` (opprinnelig jobbpris)`}
             </p>
             {succeededPayment || money.refundedOre > 0 ? (
               <p>

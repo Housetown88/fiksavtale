@@ -306,7 +306,7 @@ export async function handlePaymentWebhook(
       amountOre: fee.platformFeeOre,
       paymentId: payment.id,
       eventId: `fee_${event.eventId}`,
-      note: "Provisjon trukket automatisk ved finansiering. Ikke faktura i etterkant.",
+      note: "Provisjon trukket automatisk ved finansiering.",
     });
 
     if (!mayUnlock) {
