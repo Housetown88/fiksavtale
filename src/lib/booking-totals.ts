@@ -98,10 +98,8 @@ export function describeBookingMoney(input: {
     refundLabel = "Full DEMO-refusjon er registrert i oppgjørsboken. Provisjonen er justert ned.";
   } else if (summary.refundedOre > 0) {
     refundLabel = "Delvis DEMO-refusjon er registrert. Provisjonen er justert forholdsmessig.";
-  } else if (isCancelled && summary.fundedOre === 0) {
+  } else if (isCancelled || input.status === "REFUNDED") {
     refundLabel = "Ingen beløp ble finansiert. Ingenting gjenstår å betale.";
-  } else if (isCancelled) {
-    refundLabel = "Avbestilt etter finansiering. Refusjon er registrert i DEMO-oppgjørsboken.";
   }
 
   return {

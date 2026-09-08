@@ -84,14 +84,15 @@ describe("oppdragsbilder", () => {
       .jpeg()
       .withMetadata({
         exif: {
-          IFD3: { GPSLatitude: ["59/1", "54/1", "0/1"], GPSLongitude: ["10/1", "45/1", "0/1"] },
+          IFD0: { ImageDescription: "GPS 59.9123 10.7450 Markveien 12" },
         },
       })
       .toBuffer();
-    expect(withGps.includes(Buffer.from("GPS"))).toBe(true);
+    expect(withGps.includes(Buffer.from("Markveien 12"))).toBe(true);
     const processed = await processJobImage(withGps);
     const meta = await sharp(processed.data).metadata();
     expect(meta.exif).toBeUndefined();
+    expect(processed.data.includes(Buffer.from("Markveien 12"))).toBe(false);
     expect(processed.data.includes(Buffer.from("GPS"))).toBe(false);
   });
 
