@@ -139,8 +139,11 @@ export default async function OverviewPage() {
                 <div>
                   <p className="font-semibold">{booking.job.title}</p>
                   <p className="text-sm text-ink-soft">
-                    {money.isHistorical ? "Historisk avtalesum" : money.customerPayLabel}{" "}
+                    {user.role === "PROVIDER" ? money.providerJobLabel : money.customerPayLabel}{" "}
                     {formatNok(money.agreedOre + money.extrasPaidOre)}
+                    {user.role === "PROVIDER" && !money.isHistorical
+                      ? ` · forventet oppgjør ${formatNok(money.settlementAfterRefundOre)}`
+                      : ""}
                     {money.extrasPaidOre > 0
                       ? ` · opprinnelig ${formatNok(money.agreedOre)}`
                       : ""}

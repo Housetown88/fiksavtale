@@ -25,6 +25,12 @@ import { calcCommission, nokToOre } from "@/lib/money";
 import { JobImagePicker } from "./JobImages";
 import { Alert, FeeBox } from "./ui";
 import { JobAlertPreferenceFields, type JobAlertFieldValues } from "./JobAlertPreferenceFields";
+import {
+  applyJobCategoryChange,
+  emptyJobFormFields,
+  mergeJobFormFields,
+  type JobFormFields,
+} from "@/lib/job-form-state";
 
 function ErrorBox({ state }: { state: ActionState }) {
   if (!state?.error) return null;
@@ -276,44 +282,39 @@ export function RegisterForm() {
   );
 }
 
-type JobFormValues = {
-  title?: string;
-  description?: string;
-  category?: string;
-  subcategory?: string;
-  area?: string;
-  addressLine?: string;
-  postalCode?: string;
-  budgetMin?: string;
-  budgetMax?: string;
-};
-
 export function JobForm({
   jobId,
   initial,
 }: {
   jobId?: string;
-  initial?: JobFormValues;
+  initial?: Partial<JobFormFields>;
 }) {
   const [state, action, pending] = useActionState(jobId ? updateJobAction : createJobAction, {});
-  const [values, setValues] = useState<JobFormValues>({
-    title: initial?.title ?? "",
-    description: initial?.description ?? "",
-    category: initial?.category ?? "elektriker",
-    subcategory: initial?.subcategory ?? "",
-    area: initial?.area ?? "Grünerløkka",
-    addressLine: initial?.addressLine ?? "",
-    postalCode: initial?.postalCode ?? "",
-    budgetMin: initial?.budgetMin ?? "",
-    budgetMax: initial?.budgetMax ?? "",
+  const [values, setValues] = useState<JobFormFields>({
+    ...emptyJobFormFields(),
+    ...initial,
   });
+  const [syncedState, setSyncedState] = useState(state);
+  if (state !== syncedState) {
+    setSyncedState(state);
+    if (state.fields) {
+      setValues((current) => mergeJobFormFields(current, state.fields));
+    }
+  }
   const set =
-    (key: keyof JobFormValues) =>
+    (key: keyof JobFormFields) =>
     (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setValues((current) => ({ ...current, [key]: event.target.value }));
 
   return (
-    <form action={action} className="grid gap-3">
+    <form
+      action={action}
+      className="grid gap-3"
+      onReset={(event) => {
+        event.preventDefault();
+        if (state.fields) setValues((current) => mergeJobFormFields(current, state.fields));
+      }}
+    >
       {jobId ? <input type="hidden" name="jobId" value={jobId} /> : null}
       <ErrorBox state={state} />
       <Field id="job-title" label="Tittel">
@@ -345,12 +346,7 @@ export function JobForm({
           value={values.category}
           onChange={(event) => {
             const category = event.target.value;
-            const stillValid = childrenOf(category).some((child) => child.slug === values.subcategory);
-            setValues((current) => ({
-              ...current,
-              category,
-              subcategory: stillValid ? current.subcategory : "",
-            }));
+            setValues((current) => applyJobCategoryChange(current, category));
           }}
         >
           {JOB_CATEGORIES.map((item) => (

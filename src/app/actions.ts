@@ -26,7 +26,9 @@ import {
 } from "@/lib/domain";
 import { errorMessage } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/audit";
-import { createPaymentIntent, handlePaymentWebhook } from "@/lib/payments";
+import { createPaymentIntent, confirmDemoPayment } from "@/lib/payments";
+import { jobFormFailureState, jobFormFieldsFromFormData } from "@/lib/job-form-state";
+import type { JobFormFields } from "@/lib/job-form-state";
 import { nokToOre } from "@/lib/money";
 import { AuthzError } from "@/lib/authz";
 import { collectJobImageFiles, saveJobImages } from "@/lib/job-images";
@@ -43,7 +45,7 @@ export type ActionState = {
   error?: string;
   ok?: boolean;
   highlights?: string[];
-  fields?: {
+  fields?: Partial<JobFormFields> & {
     amount?: string;
     message?: string;
   };
@@ -140,7 +142,7 @@ export async function createJobAction(_prev: ActionState, formData: FormData): P
     redirect(`/oppdrag/${job.id}`);
   } catch (error) {
     if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
-    return actionError(error);
+    return jobFormFailureState(error, jobFormFieldsFromFormData(formData));
   }
 }
 
@@ -166,7 +168,7 @@ export async function updateJobAction(_prev: ActionState, formData: FormData): P
     redirect(`/oppdrag/${jobId}`);
   } catch (error) {
     if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
-    return actionError(error);
+    return jobFormFailureState(error, jobFormFieldsFromFormData(formData));
   }
 }
 
@@ -374,7 +376,7 @@ export async function simulateWebhookAction(formData: FormData) {
         ? "payment.cancelled"
         : "payment.succeeded";
   const extraChargeId = String(formData.get("extraChargeId") ?? "") || undefined;
-  await handlePaymentWebhook(db, {
+  await confirmDemoPayment(db, {
     eventId: `demo_${intentId}_${type}_${Date.now()}`,
     type,
     paymentIntentId: intentId,

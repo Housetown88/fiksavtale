@@ -112,9 +112,26 @@ export type WebhookResult = {
   ignored?: string;
 };
 
+export type PaymentWebhookOptions = {
+  /**
+   * Innlogget «Bekreft DEMO-betaling». Skal finansiere bookingen (PAID + kontakt)
+   * også i produksjon, der den eksterne DEMO-webhooken er sperret for ekte kunder.
+   */
+  applyFinance?: boolean;
+};
+
+/** Kundens DEMO-bekreftelse — aldri bare merke intensjon uten booking-effekt. */
+export async function confirmDemoPayment(
+  db: PrismaClient,
+  event: WebhookEvent,
+): Promise<WebhookResult> {
+  return handlePaymentWebhook(db, event, { applyFinance: true });
+}
+
 export async function handlePaymentWebhook(
   db: PrismaClient,
   event: WebhookEvent,
+  options?: PaymentWebhookOptions,
 ): Promise<WebhookResult> {
   const existing = await db.payment.findUnique({
     where: { eventId: event.eventId },
@@ -214,7 +231,18 @@ export async function handlePaymentWebhook(
   const extraAlreadyPaid =
     intent.extraChargeId && booking.extras.some((extra) => extra.id === intent.extraChargeId && extra.status === "PAID");
 
-  const mayUnlock = canUnlockViaDemoPayment(booking.customer.email);
+  const mayUnlock = Boolean(options?.applyFinance) || canUnlockViaDemoPayment(booking.customer.email);
+
+  // Ingen falsk suksess: ekstern DEMO-webhook i prod skal ikke merke intensjon som
+  // SUCCEEDED uten å finansiere bookingen. Innlogget bekreftelse bruker applyFinance.
+  if (paymentStatus === "SUCCEEDED" && !intent.extraChargeId && !mayUnlock) {
+    return {
+      idempotentReplay: false,
+      bookingStatus: booking.status,
+      contactUnlocked: Boolean(booking.contactUnlockedAt),
+      ignored: "prod_demo_blocked",
+    };
+  }
 
   await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const payment = await tx.payment.create({
@@ -293,47 +321,43 @@ export async function handlePaymentWebhook(
     }
 
     const fee = calcCommission(intent.amountOre, booking.platformFeeBps);
-    await postLedger(tx, {
-      bookingId: booking.id,
-      type: LEDGER.CHARGE,
-      amountOre: intent.amountOre,
-      paymentId: payment.id,
-      eventId: `charge_${event.eventId}`,
+    const existingCharge = await tx.settlementEntry.findFirst({
+      where: { bookingId: booking.id, type: LEDGER.CHARGE, extraChargeId: null },
     });
-    await postLedger(tx, {
-      bookingId: booking.id,
-      type: LEDGER.COMMISSION,
-      amountOre: fee.platformFeeOre,
-      paymentId: payment.id,
-      eventId: `fee_${event.eventId}`,
-      note: "Provisjon trukket automatisk ved finansiering.",
-    });
+    if (!existingCharge) {
+      await postLedger(tx, {
+        bookingId: booking.id,
+        type: LEDGER.CHARGE,
+        amountOre: intent.amountOre,
+        paymentId: payment.id,
+        eventId: `charge_${event.eventId}`,
+      });
+      await postLedger(tx, {
+        bookingId: booking.id,
+        type: LEDGER.COMMISSION,
+        amountOre: fee.platformFeeOre,
+        paymentId: payment.id,
+        eventId: `fee_${event.eventId}`,
+        note: "Provisjon trukket automatisk ved finansiering.",
+      });
+    }
 
-    if (!mayUnlock) {
+    if (booking.status === "PENDING_PAYMENT") {
       await tx.booking.update({
         where: { id: booking.id },
         data: {
+          status: "PAID",
+          contactUnlockedAt: booking.contactUnlockedAt ?? new Date(),
+          approvalDeadlineAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           platformFeeOre: fee.platformFeeOre,
           providerPayoutOre: fee.providerPayoutOre,
         },
       });
-      return;
+      await tx.job.update({
+        where: { id: booking.jobId },
+        data: { status: "BOOKED" },
+      });
     }
-
-    await tx.booking.update({
-      where: { id: booking.id },
-      data: {
-        status: "PAID",
-        contactUnlockedAt: new Date(),
-        approvalDeadlineAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        platformFeeOre: fee.platformFeeOre,
-        providerPayoutOre: fee.providerPayoutOre,
-      },
-    });
-    await tx.job.update({
-      where: { id: booking.jobId },
-      data: { status: "BOOKED" },
-    });
   });
 
   const updated = await db.booking.findUniqueOrThrow({

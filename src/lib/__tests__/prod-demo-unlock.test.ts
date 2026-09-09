@@ -54,5 +54,11 @@ describe("DEMO-betaling i produksjon", () => {
     expect(after.status).toBe("PENDING_PAYMENT");
     expect(after.contactUnlockedAt).toBeNull();
     expect(await canViewerSeeContact(db, { viewerId: users.provider.id, jobId: job.id })).toBe(false);
+    const intentAfter = await db.paymentIntent.findUniqueOrThrow({ where: { id: intent.id } });
+    expect(intentAfter.status).toBe("PENDING");
+    const succeeded = await db.payment.findMany({
+      where: { bookingId: booking.id, status: "SUCCEEDED" },
+    });
+    expect(succeeded).toHaveLength(0);
   });
 });

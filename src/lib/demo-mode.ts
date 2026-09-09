@@ -59,7 +59,10 @@ export function assertStrongAdminPassword(password: string): void {
   }
 }
 
-/** DEMO-webhook kan aldri låse opp ekte kundedata i produksjon. */
+/**
+ * Ekstern DEMO-webhook kan aldri låse opp ekte kundedata i produksjon.
+ * Innlogget «Bekreft DEMO-betaling» (applyFinance) er unntaket — det er selve DEMO-kassen.
+ */
 export function demoPaymentsAllowed(): boolean {
   if (flagOn("ALLOW_DEMO_PAYMENTS")) return true;
   return !isProductionRuntime();
