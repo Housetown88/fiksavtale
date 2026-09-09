@@ -1,3 +1,5 @@
+import { isTerminalBookingStatus } from "./booking-totals";
+
 export type PaymentConfirmView = {
   title: string;
   body: string;
@@ -50,6 +52,7 @@ export function paymentConfirmView(input: {
   const extraPaid = input.extraChargeStatus === "PAID";
   const extraApprovedUnpaid = extra && input.extraChargeStatus === "APPROVED";
   const financed = isFinancedStatus(input.bookingStatus);
+  const closed = isTerminalBookingStatus(input.bookingStatus);
 
   if (extra) {
     if (extraPaid) {
@@ -58,6 +61,36 @@ export function paymentConfirmView(input: {
         body: "Tillegget er merket som betalt, og provisjonen er registrert automatisk.",
         nextAction: "Gå tilbake til bookingen for å se oppdatert total.",
         tone: "ok",
+        showRetry: false,
+        showSimulate: false,
+      };
+    }
+
+    if (closed) {
+      const closedCopy =
+        input.bookingStatus === "REFUNDED"
+          ? {
+              title: "Bookingen er refundert",
+              body: "Tillegget kan ikke betales. Ventende betalingsøkter er ugyldige etter refusjon. Ingen ny finansiering eller provisjon registreres.",
+            }
+          : input.bookingStatus === "DISPUTED"
+            ? {
+                title: "Bookingen er i tvist",
+                body: "Tillegget kan ikke betales mens bookingen er i tvist. Ventende betalingsøkter er ugyldige. Ingen ny finansiering eller provisjon registreres.",
+              }
+            : input.bookingStatus === "COMPLETED"
+              ? {
+                  title: "Arbeidet er allerede fullført",
+                  body: "Tillegget kan ikke betales på en fullført booking.",
+                }
+              : {
+                  title: "Bookingen er avbestilt",
+                  body: "Tillegget kan ikke betales. Ventende betalingsøkter er ugyldige etter avbestilling.",
+                };
+      return {
+        ...closedCopy,
+        nextAction: "Gå tilbake til bookingen. DEMO — ingen ekte Vipps-trekk.",
+        tone: "warn",
         showRetry: false,
         showSimulate: false,
       };
@@ -116,6 +149,36 @@ export function paymentConfirmView(input: {
         : "Bookingen er merket som finansiert. Kontakt vises når serveren har bekreftet betalingen.",
       nextAction: "Åpne bookingen for å se kontakt og neste steg.",
       tone: "ok",
+      showRetry: false,
+      showSimulate: false,
+    };
+  }
+
+  if (closed) {
+    const closedCopy =
+      input.bookingStatus === "REFUNDED"
+        ? {
+            title: "Bookingen er refundert",
+            body: "Betalingen kan ikke bekreftes. Ventende betalingsøkter er ugyldige etter refusjon.",
+          }
+        : input.bookingStatus === "DISPUTED"
+          ? {
+              title: "Bookingen er i tvist",
+              body: "Betalingen kan ikke bekreftes mens bookingen er i tvist.",
+            }
+          : input.bookingStatus === "COMPLETED"
+            ? {
+                title: "Arbeidet er allerede fullført",
+                body: "Betalingen kan ikke bekreftes på en fullført booking.",
+              }
+            : {
+                title: "Bookingen er avbestilt",
+                body: "Betalingen kan ikke bekreftes. Ventende betalingsøkter er ugyldige etter avbestilling.",
+              };
+    return {
+      ...closedCopy,
+      nextAction: "Gå tilbake til bookingen. DEMO — ingen ekte Vipps-trekk.",
+      tone: "warn",
       showRetry: false,
       showSimulate: false,
     };

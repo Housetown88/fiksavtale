@@ -19,10 +19,17 @@ import { formatNok } from "@/lib/money";
 import { statusLabelNb } from "@/lib/status-labels";
 import { LEDGER } from "@/lib/ledger";
 
-export default async function BookingPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function BookingPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ varsel?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user) notFound();
   const { id } = await params;
+  const { varsel } = await searchParams;
   let booking;
   try {
     booking = await getBookingForViewer(db, user, id);
@@ -57,6 +64,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         <PageTitle kicker="Booking" title={job.title}>
           <StatusBadge status={booking.status} />
         </PageTitle>
+        {varsel ? <Alert tone="warn">{varsel}</Alert> : null}
         {money.isCancelled ? (
           <Alert tone="warn">
             Bookingen er avbestilt. Tilbudet som ble valgt står fortsatt som godtatt i historikken — det er
@@ -71,9 +79,14 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         ) : null}
         {money.inconsistentUnpaidApproved ? (
           <Alert tone="warn">
-            Avvik: status er {statusLabelNb(booking.status)}, men godkjente tillegg på{" "}
-            {formatNok(money.extrasApprovedUnpaidOre)} er ubetalt. Nye fullføringer blokkeres til tilleggene
-            er betalt. Dette telles ikke som «gjenstår å betale».
+            Avvik: jobben ble merket fullført mens godkjente tillegg på{" "}
+            {formatNok(money.extrasApprovedUnpaidOre)} sto ubetalt. Dette er historikk, ikke et
+            betalingskrav — bookingen er allerede avsluttet.
+          </Alert>
+        ) : money.isClosed && money.unpaidApprovedCount > 0 ? (
+          <Alert tone="info">
+            Bookingen er avsluttet. Godkjente ubetalte tillegg vises som historikk og kan ikke betales
+            her.
           </Alert>
         ) : null}
         <div className="mt-3">
@@ -175,8 +188,9 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         <div className="card p-5">
           <h2 className="font-serif text-xl">Tillegg</h2>
           <p className="text-sm text-ink-soft">
-            Ekstra arbeid skal godkjennes og betales i appen før det teller som finansiert. Godkjenning alene
-            endrer ikke jobbprisen.
+            {money.isClosed
+              ? "Tillegg vises som historikk. Ubetalte tillegg kan ikke betales på en avsluttet booking."
+              : "Ekstra arbeid skal godkjennes og betales i appen før det teller som finansiert. Godkjenning alene endrer ikke jobbprisen."}
           </p>
           <ul className="mt-3 space-y-3 text-sm">
             {extras.map((extra) => {

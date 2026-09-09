@@ -8,7 +8,7 @@ import { simulateWebhookAction, startDemoPaymentAction } from "@/app/actions";
 import { Alert, PageTitle, StatusBadge } from "@/components/ui";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { demoIntentBadgeStatus, paymentConfirmView } from "@/lib/payment-status-ui";
-import { describeBookingMoney } from "@/lib/booking-totals";
+import { describeBookingMoney, isTerminalBookingStatus } from "@/lib/booking-totals";
 import { formatNok } from "@/lib/money";
 
 export default async function PaymentConfirmPage({
@@ -16,12 +16,12 @@ export default async function PaymentConfirmPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ intent?: string; extra?: string }>;
+  searchParams: Promise<{ intent?: string; extra?: string; varsel?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) notFound();
   const { id } = await params;
-  const { intent, extra } = await searchParams;
+  const { intent, extra, varsel } = await searchParams;
   let booking;
   try {
     booking = await getBookingForViewer(db, user, id);
@@ -60,6 +60,7 @@ export default async function PaymentConfirmPage({
       <PageTitle kicker="DEMO-betaling" title={view.title}>
         {view.body}
       </PageTitle>
+      {varsel ? <Alert tone="warn">{varsel}</Alert> : null}
       <div className="card space-y-3 p-5">
         <p>
           Bookingstatus: <StatusBadge status={booking.status} />
@@ -143,7 +144,7 @@ export default async function PaymentConfirmPage({
             </form>
           </div>
         ) : null}
-        {view.showSimulate && intent && extraCharge && extraCharge.status === "APPROVED" ? (
+        {view.showSimulate && intent && extraCharge && extraCharge.status === "APPROVED" && !isTerminalBookingStatus(booking.status) ? (
           <div className="flex flex-wrap gap-2">
             <form action={simulateWebhookAction}>
               <input type="hidden" name="bookingId" value={booking.id} />
@@ -174,7 +175,7 @@ export default async function PaymentConfirmPage({
             </form>
           </div>
         ) : null}
-        {view.showRetry ? (
+        {view.showRetry && !isTerminalBookingStatus(booking.status) ? (
           <form action={startDemoPaymentAction}>
             <input type="hidden" name="bookingId" value={booking.id} />
             {extraCharge ? <input type="hidden" name="extraChargeId" value={extraCharge.id} /> : null}

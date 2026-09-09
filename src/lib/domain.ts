@@ -11,7 +11,7 @@ import { lookupOrgInBrreg } from "./brreg";
 import { sendPasswordResetEmail } from "./email";
 import { hitRateLimit } from "./rate-limit";
 import { LEDGER, postLedger } from "./ledger";
-import { refundBooking } from "./payments";
+import { cancelPendingPaymentIntents, refundBooking } from "./payments";
 import { summarizeBookingMoney, unpaidApprovedExtras } from "./booking-totals";
 import { ensureProviderAlertPreference, assertValidJobTaxonomy } from "./job-alerts";
 
@@ -503,12 +503,29 @@ export async function markWorkStarted(db: PrismaClient, viewer: Viewer, bookingI
   });
 }
 
+function completeBlockedMessage(status: string): string {
+  switch (status) {
+    case "REFUNDED":
+      return "Bookingen er refundert";
+    case "DISPUTED":
+      return "Bookingen er i tvist";
+    case "COMPLETED":
+      return "Arbeidet er allerede fullført";
+    case "CANCELLED":
+      return "Bookingen er avbestilt";
+    case "PENDING_PAYMENT":
+      return "Bookingen er ikke betalt ennå.";
+    default:
+      return "Bookingen kan ikke fullføres i denne tilstanden.";
+  }
+}
+
 function assertCanCompleteBooking(booking: { status: string; extras: { status: string }[] }) {
   if (booking.status !== "IN_PROGRESS" && booking.status !== "PAID") {
-    throw new Error("Bookingen kan ikke fullføres i denne tilstanden.");
+    throw new Error(completeBlockedMessage(booking.status));
   }
   if (unpaidApprovedExtras(booking.extras).length > 0) {
-    throw new Error("Godkjente tillegg må betales før jobben kan fullføres.");
+    throw new Error("Tillegget må betales først");
   }
 }
 
@@ -539,7 +556,8 @@ export async function completeBooking(db: PrismaClient, viewer: Viewer, bookingI
       data: { status: "COMPLETED", completedAt: new Date(), payoutReleasedAt: new Date() },
     });
     if (updated.count !== 1) {
-      throw new Error("Bookingen kan ikke fullføres i denne tilstanden.");
+      const latest = await tx.booking.findUnique({ where: { id: booking.id } });
+      throw new Error(completeBlockedMessage(latest?.status ?? "UNKNOWN"));
     }
     await tx.job.update({ where: { id: booking.jobId }, data: { status: "COMPLETED" } });
     const money = summarizeBookingMoney(fresh.amountOre, fresh.extras, fresh.platformFeeBps, {
@@ -676,11 +694,15 @@ export async function cancelBooking(
   }
   if (booking.status === "IN_PROGRESS" || booking.workStartedAt) {
     return db.$transaction(async (tx) => {
+      await cancelPendingPaymentIntents(tx, booking.id);
       await tx.job.update({ where: { id: booking.jobId }, data: { status: "DISPUTED" } });
       await postLedger(tx, {
         bookingId: booking.id,
         type: LEDGER.DISPUTE_HOLD,
-        amountOre: summarizeBookingMoney(booking.amountOre, booking.extras, booking.platformFeeBps).fundedOre,
+        amountOre: summarizeBookingMoney(booking.amountOre, booking.extras, booking.platformFeeBps, {
+          status: booking.status,
+          refundedOre: booking.refundedOre,
+        }).fundedOre,
         eventId: `dispute_${booking.id}`,
         note: "Avbestilling etter start åpner tvist. Oppgjør holdes.",
       });
@@ -698,12 +720,14 @@ export async function cancelBooking(
   const funded = booking.payments.some((payment) => payment.status === "SUCCEEDED");
   if (funded && booking.status === "PAID") {
     const money = summarizeBookingMoney(booking.amountOre, booking.extras, booking.platformFeeBps, {
+      status: booking.status,
       refundedOre: booking.refundedOre,
     });
     const remaining = Math.max(0, money.fundedOre - booking.refundedOre);
     if (remaining > 0) {
       await refundBooking(db, booking.id, remaining, `cancel_refund_${booking.id}`);
     }
+    await cancelPendingPaymentIntents(db, booking.id);
     await db.job.update({ where: { id: booking.jobId }, data: { status: "CANCELLED" } });
     return db.booking.update({
       where: { id: booking.id },
@@ -715,10 +739,7 @@ export async function cancelBooking(
     });
   }
 
-  await db.paymentIntent.updateMany({
-    where: { bookingId: booking.id, status: "PENDING" },
-    data: { status: "EXPIRED" },
-  });
+  await cancelPendingPaymentIntents(db, booking.id);
   return db.$transaction(async (tx) => {
     await tx.job.update({
       where: { id: booking.jobId },

@@ -113,7 +113,7 @@ describe("tillegg", () => {
     });
     await expect(
       completeBooking(db, { id: users.customer.id, role: "CUSTOMER" }, booking.id),
-    ).rejects.toThrow(/tilstanden/);
+    ).rejects.toThrow(/fullført/);
 
     const extras = await db.extraCharge.findMany({ where: { bookingId: booking.id } });
     const view = describeBookingMoney({
@@ -124,5 +124,30 @@ describe("tillegg", () => {
     });
     expect(view.remainingToPayOre).toBe(0);
     expect(view.inconsistentUnpaidApproved).toBe(true);
+  });
+
+  it("gir konkrete meldinger når fullføring treffer lukket booking eller ubetalt tillegg", async () => {
+    const unpaid = await paidBooking();
+    const extra = await proposeExtra(db, { id: unpaid.users.provider.id, role: "PROVIDER" }, {
+      bookingId: unpaid.booking.id,
+      title: "Ekstra stikk",
+      amountOre: 20_000,
+    });
+    await decideExtra(db, { id: unpaid.users.customer.id, role: "CUSTOMER" }, extra.id, "APPROVED");
+    await expect(
+      completeBooking(db, { id: unpaid.users.customer.id, role: "CUSTOMER" }, unpaid.booking.id),
+    ).rejects.toThrow("Tillegget må betales først");
+
+    const refunded = await paidBooking();
+    await db.booking.update({ where: { id: refunded.booking.id }, data: { status: "REFUNDED" } });
+    await expect(
+      completeBooking(db, { id: refunded.users.customer.id, role: "CUSTOMER" }, refunded.booking.id),
+    ).rejects.toThrow("Bookingen er refundert");
+
+    const disputed = await paidBooking();
+    await db.booking.update({ where: { id: disputed.booking.id }, data: { status: "DISPUTED" } });
+    await expect(
+      completeBooking(db, { id: disputed.users.customer.id, role: "CUSTOMER" }, disputed.booking.id),
+    ).rejects.toThrow("Bookingen er i tvist");
   });
 });

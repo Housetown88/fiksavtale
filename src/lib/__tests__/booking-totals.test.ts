@@ -36,6 +36,7 @@ describe("prisoversikt", () => {
     expect(money.originalJobLabel).toBe("Opprinnelig jobbpris");
     expect(money.customerPayLabel).toBe("Historisk avtalesum");
     expect(money.customerPayLabel).not.toBe("Du betaler");
+    expect(money.financedOre).toBe(0);
     expect(money.remainingToPayOre).toBe(0);
     expect(money.refund.status).toBe("not_applicable");
     expect(money.refund.statusLabel).toBe("Ikke aktuelt");
@@ -76,6 +77,8 @@ describe("prisoversikt", () => {
     expect(money.refund.amountOre).toBe(150_000);
     expect(money.remainingToPayOre).toBe(0);
     expect(money.refund.detail).toMatch(/ikke et ekte Vipps/i);
+    expect(money.financedOre).toBe(150_000);
+    expect(money.agreedOre).toBe(150_000);
   });
 
   it("flagger historisk fullført med ubetalte godkjente tillegg uten å kreve betaling", () => {
@@ -90,6 +93,42 @@ describe("prisoversikt", () => {
     expect(money.unpaidApprovedCount).toBe(1);
     expect(money.extrasApprovedUnpaidOre).toBe(20_000);
     expect(money.isClosed).toBe(true);
+  });
+
+  it("flagger ikke avbestilt/tvist med ubetalt tillegg som fullføringsavvik", () => {
+    const refunded = describeBookingMoney({
+      agreedOre: 150_000,
+      extras: [{ amountOre: 20_000, status: "APPROVED" }],
+      platformFeeBps: 1000,
+      status: "REFUNDED",
+      refundedOre: 150_000,
+    });
+    expect(refunded.inconsistentUnpaidApproved).toBe(false);
+    expect(refunded.unpaidApprovedCount).toBe(1);
+    expect(refunded.remainingToPayOre).toBe(0);
+    expect(refunded.financedOre).toBe(150_000);
+
+    const disputed = describeBookingMoney({
+      agreedOre: 150_000,
+      extras: [{ amountOre: 20_000, status: "APPROVED" }],
+      platformFeeBps: 1000,
+      status: "DISPUTED",
+    });
+    expect(disputed.inconsistentUnpaidApproved).toBe(false);
+    expect(disputed.unpaidApprovedCount).toBe(1);
+    expect(disputed.remainingToPayOre).toBe(0);
+  });
+
+  it("viser 0 kr finansiert for ubetalt booking", () => {
+    const pending = describeBookingMoney({
+      agreedOre: 220_000,
+      extras: [],
+      platformFeeBps: 1000,
+      status: "PENDING_PAYMENT",
+    });
+    expect(pending.agreedOre).toBe(220_000);
+    expect(pending.financedOre).toBe(0);
+    expect(pending.remainingToPayOre).toBe(220_000);
   });
 
   it("justerer gebyr etter delvis refusjon uten dobbelttelling", () => {

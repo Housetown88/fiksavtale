@@ -35,8 +35,8 @@ export default async function AdminPaymentsPage() {
                 <StatusBadge status={payment.status} showRaw />
               </div>
               <p>
-                Hendelse {formatNok(payment.amountOre)} · samlet finansiert {formatNok(money.fundedOre)} ·
-                gebyr {formatNok(money.feeAfterRefundOre)}
+                Hendelse {formatNok(payment.amountOre)} · avtalt {formatNok(money.agreedOre)} · finansiert{" "}
+                {formatNok(money.financedOre)} · gebyr {formatNok(money.feeAfterRefundOre)}
                 {money.refund.status === "applied"
                   ? ` · DEMO-refusjon ${formatNok(money.refund.amountOre)} (${money.refund.statusLabel})`
                   : money.refund.status === "pending"

@@ -21,6 +21,7 @@ export type BookingMoneySummary = {
   extrasApprovedUnpaidOre: number;
   extrasProposedOre: number;
   fundedOre: number;
+  financedOre: number;
   combinedIfApprovedOre: number;
   feeOnFundedOre: number;
   feeOnApprovedExtraOre: number;
@@ -132,13 +133,17 @@ export function summarizeBookingMoney(
   const extrasProposedOre = extras
     .filter((item) => item.status === "PROPOSED")
     .reduce((sum, item) => sum + item.amountOre, 0);
+  const status = options?.status ?? "";
+  const jobWasFinanced = status
+    ? ["PAID", "IN_PROGRESS", "COMPLETED", "REFUNDED", "DISPUTED"].includes(status)
+    : true;
   const fundedOre = agreedOre + extrasPaidOre;
+  const financedOre = (jobWasFinanced ? agreedOre : 0) + extrasPaidOre;
   const combinedIfApprovedOre = fundedOre + extrasApprovedUnpaidOre;
   const feeOnFundedOre = calcCommission(fundedOre, platformFeeBps).platformFeeOre;
   const feeOnApprovedExtraOre = calcCommission(extrasApprovedUnpaidOre, platformFeeBps).platformFeeOre;
   const feeOnProposedExtraOre = calcCommission(extrasProposedOre, platformFeeBps).platformFeeOre;
   const expectedSettlementOre = calcCommission(fundedOre, platformFeeBps).providerPayoutOre;
-  const status = options?.status ?? "";
   const refundedOre = options?.refundedOre ?? 0;
   const remainingBase = status === "PENDING_PAYMENT" ? agreedOre : 0;
   const remainingToPayOre = isTerminalBookingStatus(status)
@@ -154,6 +159,7 @@ export function summarizeBookingMoney(
     extrasApprovedUnpaidOre,
     extrasProposedOre,
     fundedOre,
+    financedOre,
     combinedIfApprovedOre,
     feeOnFundedOre,
     feeOnApprovedExtraOre,
@@ -164,7 +170,7 @@ export function summarizeBookingMoney(
     refundedOre,
     feeAfterRefundOre,
     settlementAfterRefundOre,
-    inconsistentUnpaidApproved: isTerminalBookingStatus(status) && unpaidApprovedCount > 0,
+    inconsistentUnpaidApproved: status === "COMPLETED" && unpaidApprovedCount > 0,
   };
 }
 
