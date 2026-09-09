@@ -35,6 +35,8 @@ import { adminDemoAllowed, isDemoAdminEmail } from "@/lib/demo-mode";
 import { headers } from "next/headers";
 import { createDataRequest, exportUserData, resolveDataRequest, type DataRequestType } from "@/lib/privacy";
 import { lookupOrgInBrreg } from "@/lib/brreg";
+import { dispatchJobAlerts, saveJobAlertPreference } from "@/lib/job-alerts";
+import { parseRadiusKm } from "@/lib/categories";
 
 export type ActionState = {
   error?: string;
@@ -78,6 +80,10 @@ export async function registerAction(_prev: ActionState, formData: FormData): Pr
       orgNumber: String(formData.get("orgNumber") ?? "") || undefined,
       about: String(formData.get("about") ?? "") || undefined,
       serviceAreas: String(formData.get("serviceAreas") ?? "") || undefined,
+      alertCategories: formData.getAll("alertCategories").map(String),
+      alertAreas: formData.getAll("alertAreas").map(String),
+      alertRadiusKm: parseRadiusKm(formData.get("alertRadiusKm")),
+      alertEmailEnabled: String(formData.get("alertEmailEnabled") ?? "") === "1",
     });
     await createSession(user.id);
   } catch (error) {
@@ -108,6 +114,7 @@ export async function createJobAction(_prev: ActionState, formData: FormData): P
       title: String(formData.get("title") ?? ""),
       description: String(formData.get("description") ?? ""),
       category: String(formData.get("category") ?? ""),
+      subcategory: String(formData.get("subcategory") ?? "") || null,
       area: String(formData.get("area") ?? ""),
       postalCode: String(formData.get("postalCode") ?? "") || undefined,
       addressLine: String(formData.get("addressLine") ?? "") || undefined,
@@ -119,6 +126,11 @@ export async function createJobAction(_prev: ActionState, formData: FormData): P
     } catch (error) {
       await db.job.delete({ where: { id: job.id } });
       throw error;
+    }
+    try {
+      await dispatchJobAlerts(db, job);
+    } catch (error) {
+      console.error("job-alerts-dispatch-failed", job.id, error);
     }
     redirect(`/oppdrag/${job.id}`);
   } catch (error) {
@@ -139,6 +151,7 @@ export async function updateJobAction(_prev: ActionState, formData: FormData): P
       title: String(formData.get("title") ?? ""),
       description: String(formData.get("description") ?? ""),
       category: String(formData.get("category") ?? ""),
+      subcategory: String(formData.get("subcategory") ?? "") || null,
       area: String(formData.get("area") ?? ""),
       postalCode: String(formData.get("postalCode") ?? "") || undefined,
       addressLine: String(formData.get("addressLine") ?? "") || undefined,
@@ -148,6 +161,28 @@ export async function updateJobAction(_prev: ActionState, formData: FormData): P
     redirect(`/oppdrag/${jobId}`);
   } catch (error) {
     if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
+    return actionError(error);
+  }
+}
+
+export async function updateJobAlertPreferenceAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    const user = await viewer();
+    await saveJobAlertPreference(db, user, {
+      categories: formData.getAll("alertCategories").map(String),
+      areas: formData.getAll("alertAreas").map(String),
+      radiusKm: parseRadiusKm(formData.get("alertRadiusKm")),
+      emailEnabled: String(formData.get("alertEmailEnabled") ?? "") === "1",
+      paused: String(formData.get("alertPaused") ?? "") === "1",
+    });
+    revalidatePath("/konto/jobbvarsler");
+    revalidatePath("/oversikt");
+    revalidatePath("/konto");
+    return { ok: true };
+  } catch (error) {
     return actionError(error);
   }
 }

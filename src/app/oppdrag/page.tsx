@@ -16,6 +16,7 @@ export default async function JobsPage({
     title: string;
     description: string;
     category: string;
+    subcategory: string | null;
     area: string;
     budgetMinOre: number | null;
     budgetMaxOre: number | null;
@@ -50,6 +51,7 @@ export default async function JobsPage({
         title: job.title,
         description: job.description,
         category: job.category,
+        subcategory: job.subcategory,
         area: job.area,
         budgetMinOre: job.budgetMinOre,
         budgetMaxOre: job.budgetMaxOre,

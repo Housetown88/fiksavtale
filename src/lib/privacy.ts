@@ -31,6 +31,7 @@ export async function exportUserData(db: PrismaClient, viewer: Viewer) {
     include: {
       customerProfile: true,
       providerProfile: true,
+      jobAlertPreference: true,
       jobs: { select: { id: true, title: true, category: true, area: true, status: true, createdAt: true } },
       bookingsAsCustomer: {
         select: {
@@ -83,6 +84,16 @@ export async function exportUserData(db: PrismaClient, viewer: Viewer) {
           serviceAreas: user.providerProfile.serviceAreas,
         }
       : null,
+    jobAlertPreference: user.jobAlertPreference
+      ? {
+          categories: user.jobAlertPreference.categories,
+          areas: user.jobAlertPreference.areas,
+          radiusKm: user.jobAlertPreference.radiusKm,
+          emailEnabled: user.jobAlertPreference.emailEnabled,
+          paused: user.jobAlertPreference.paused,
+          updatedAt: user.jobAlertPreference.updatedAt,
+        }
+      : null,
     jobs: user.jobs,
     bookingsAsCustomer: user.bookingsAsCustomer,
     bookingsAsProvider: user.bookingsAsProvider,
@@ -113,6 +124,8 @@ export async function anonymizeUser(db: PrismaClient, actor: Viewer, userId: str
   await db.$transaction(async (tx) => {
     await tx.session.deleteMany({ where: { userId } });
     await tx.passwordResetToken.deleteMany({ where: { userId } });
+    await tx.jobAlertDelivery.deleteMany({ where: { providerId: userId } });
+    await tx.jobAlertPreference.deleteMany({ where: { userId } });
     await tx.jobImage.deleteMany({ where: { job: { customerId: userId } } });
     await tx.message.updateMany({
       where: { senderId: userId },

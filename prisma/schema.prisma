@@ -95,6 +95,8 @@ model User {
   passwordResetTokens PasswordResetToken[]
   dataRequests    DataRequest[]
   deletedAt       DateTime?
+  jobAlertPreference JobAlertPreference?
+  jobAlertDeliveries JobAlertDelivery[]
 }
 
 model Session {
@@ -131,6 +133,7 @@ model ProviderProfile {
   about              String?
   serviceAreas       String?
   invoiceEmail       String?
+  jobAlertPreference JobAlertPreference?
 }
 
 model Job {
@@ -140,6 +143,7 @@ model Job {
   title       String
   description String
   category    String
+  subcategory String?
   area        String
   postalCode  String?
   addressLine String?
@@ -154,6 +158,7 @@ model Job {
   booking       Booking?
   reports       Report[]
   images        JobImage[]
+  alertDeliveries JobAlertDelivery[]
 }
 
 model JobImage {
@@ -380,4 +385,33 @@ model AuthThrottle {
   createdAt DateTime @default(now())
 
   @@index([key, createdAt])
+}
+
+model JobAlertPreference {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerProfileId String   @unique
+  providerProfile   ProviderProfile @relation(fields: [providerProfileId], references: [id], onDelete: Cascade)
+  categories        Json     @default("[]")
+  areas             Json     @default("[]")
+  radiusKm          Int?
+  emailEnabled      Boolean  @default(false)
+  paused            Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model JobAlertDelivery {
+  id         String    @id @default(cuid())
+  jobId      String
+  job        Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  providerId String
+  provider   User      @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  status     String    @default("QUEUED")
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@unique([jobId, providerId])
+  @@index([providerId])
 }
