@@ -13,9 +13,20 @@ import { OfferForm, ReportForm } from "@/components/forms";
 import { JobImageGallery } from "@/components/JobImages";
 import { formatBudgetRange } from "@/lib/budget";
 import { formatNok } from "@/lib/money";
+import { formatOsloDateTime } from "@/lib/format";
+import { canShowOfferSuccess } from "@/lib/offer-submit";
+import { OfferSentConfirmation } from "@/components/OfferSentConfirmation";
+import { ProviderSentOffer } from "@/components/ProviderSentOffer";
 
-export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function JobDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ sendt?: string }>;
+}) {
   const { id } = await params;
+  const { sendt } = await searchParams;
   const user = await getCurrentUser();
   let job;
   try {
@@ -51,6 +62,21 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     select: { id: true },
     orderBy: { sortOrder: "asc" },
   });
+  const ownPendingOffer =
+    user?.role === "PROVIDER"
+      ? offers.find((offer) => offer.providerId === user.id && offer.status === "PENDING")
+      : undefined;
+  const confirmedSentOffer =
+    user?.role === "PROVIDER" && sendt
+      ? offers.find(
+          (offer) => offer.providerId === user.id && offer.id === sendt && offer.status === "PENDING",
+        )
+      : undefined;
+  const showOfferSuccess = canShowOfferSuccess({
+    sentOfferId: sendt,
+    confirmedOfferId: confirmedSentOffer?.id,
+  });
+  const jobHref = `/oppdrag/${job.id}`;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
@@ -147,7 +173,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   </div>
                   <p className="mt-2 text-sm">{offer.message}</p>
                   <p className="mt-2 text-xs text-ink-soft">
-                    Status: <StatusBadge status={offer.status} />. Gebyr{" "}
+                    Sendt {formatOsloDateTime(offer.createdAt)}. Status:{" "}
+                    <StatusBadge status={offer.status} kind="offer" />. Gebyr{" "}
                     {formatNok(calcCommission(offer.amountOre, feeBps).platformFeeOre)} trekkes automatisk
                     ved finansiering.
                     {job.status === "CANCELLED" && offer.status === "ACCEPTED"
@@ -175,16 +202,33 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       </div>
 
       <aside className="space-y-4">
+        {showOfferSuccess && confirmedSentOffer ? (
+          <OfferSentConfirmation
+            jobTitle={job.title}
+            amountLabel={formatNok(confirmedSentOffer.amountOre)}
+            sentAtLabel={formatOsloDateTime(confirmedSentOffer.createdAt)}
+            jobHref={jobHref}
+          />
+        ) : null}
         {user?.role === "PROVIDER" && job.status === "OPEN" ? (
-          <div className="card p-5">
-            <h2 className="font-serif text-xl tracking-tight">Gi tilbud</h2>
-            <p className="mt-1 text-sm text-ink-soft">
-              Kunden ser totalen. Dere ser gebyr og forventet oppgjør mens dere skriver prisen.
-            </p>
-            <div className="mt-3">
-              <OfferForm jobId={job.id} feeBps={feeBps} defaultAmountOre={quoteAmount} />
+          ownPendingOffer ? (
+            <ProviderSentOffer
+              amountOre={ownPendingOffer.amountOre}
+              message={ownPendingOffer.message}
+              sentAtLabel={formatOsloDateTime(ownPendingOffer.createdAt)}
+              status={ownPendingOffer.status}
+            />
+          ) : (
+            <div className="card p-5">
+              <h2 className="font-serif text-xl tracking-tight">Send tilbud</h2>
+              <p className="mt-1 text-sm text-ink-soft">
+                Kunden ser totalen. Dere ser gebyr og forventet oppgjør mens dere skriver prisen.
+              </p>
+              <div className="mt-3">
+                <OfferForm jobId={job.id} feeBps={feeBps} defaultAmountOre={quoteAmount} />
+              </div>
             </div>
-          </div>
+          )
         ) : null}
         {!user ? (
           <Alert>

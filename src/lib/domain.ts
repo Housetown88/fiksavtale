@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Offer, PrismaClient } from "@prisma/client";
 import { assertNoContactLeak } from "./leak-filter";
 import { calcCommission } from "./money";
 import { isValidOrgNumber, normalizeOrgNumber } from "./orgnr";
@@ -287,11 +287,24 @@ export function parseJobBudget(form: { budgetMin?: unknown; budgetMax?: unknown 
   return parseBudgetRange(form);
 }
 
+export type CreateOfferResult = {
+  offer: Offer;
+  created: boolean;
+};
+
 export async function createOffer(
   db: PrismaClient,
   viewer: Viewer,
   input: { jobId: string; amountOre: number; message: string },
 ) {
+  return (await createOfferResult(db, viewer, input)).offer;
+}
+
+export async function createOfferResult(
+  db: PrismaClient,
+  viewer: Viewer,
+  input: { jobId: string; amountOre: number; message: string },
+): Promise<CreateOfferResult> {
   if (viewer.role !== "PROVIDER") {
     throw new AuthzError("Bare registrerte bedrifter kan sende tilbud", 403);
   }
@@ -302,47 +315,60 @@ export async function createOffer(
   if (!provider?.providerProfile) {
     throw new AuthzError("Firmaprofil mangler", 403);
   }
+
+  const job = await db.job.findUnique({ where: { id: input.jobId } });
+  if (job?.customerId === viewer.id) {
+    throw new Error("Du kan ikke gi tilbud på eget oppdrag.");
+  }
+
+  const existing = job
+    ? await db.offer.findFirst({
+        where: { jobId: job.id, providerId: viewer.id, status: "PENDING" },
+      })
+    : null;
+  if (existing) {
+    return { offer: existing, created: false };
+  }
+
   if (input.amountOre < 10000) {
     throw new Error("Tilbudet må være minst 100 NOK.");
   }
   assertNoContactLeak(input.message);
 
-  const job = await db.job.findUnique({ where: { id: input.jobId } });
   if (!job || job.status !== "OPEN") {
     throw new Error("Oppdraget er ikke åpent for nye tilbud.");
   }
-  if (job.customerId === viewer.id) {
-    throw new Error("Du kan ikke gi tilbud på eget oppdrag.");
-  }
 
-  const existing = await db.offer.findFirst({
-    where: { jobId: job.id, providerId: viewer.id, status: "PENDING" },
+  return db.$transaction(async (tx) => {
+    const pending = await tx.offer.findFirst({
+      where: { jobId: job.id, providerId: viewer.id, status: "PENDING" },
+    });
+    if (pending) {
+      return { offer: pending, created: false };
+    }
+
+    const offer = await tx.offer.create({
+      data: {
+        jobId: job.id,
+        providerId: viewer.id,
+        amountOre: input.amountOre,
+        message: input.message.trim(),
+      },
+    });
+
+    await tx.conversation.upsert({
+      where: { jobId_providerId: { jobId: job.id, providerId: viewer.id } },
+      update: { offerId: offer.id },
+      create: {
+        jobId: job.id,
+        providerId: viewer.id,
+        customerId: job.customerId,
+        offerId: offer.id,
+      },
+    });
+
+    return { offer, created: true };
   });
-  if (existing) {
-    throw new Error("Du har allerede et aktivt tilbud på dette oppdraget.");
-  }
-
-  const offer = await db.offer.create({
-    data: {
-      jobId: job.id,
-      providerId: viewer.id,
-      amountOre: input.amountOre,
-      message: input.message.trim(),
-    },
-  });
-
-  await db.conversation.upsert({
-    where: { jobId_providerId: { jobId: job.id, providerId: viewer.id } },
-    update: { offerId: offer.id },
-    create: {
-      jobId: job.id,
-      providerId: viewer.id,
-      customerId: job.customerId,
-      offerId: offer.id,
-    },
-  });
-
-  return offer;
 }
 
 export async function sendMessage(

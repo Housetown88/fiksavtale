@@ -9,7 +9,7 @@ import {
   cancelBooking,
   completeBooking,
   createJob,
-  createOffer,
+  createOfferResult,
   createReport,
   createReview,
   decideExtra,
@@ -31,6 +31,7 @@ import { nokToOre } from "@/lib/money";
 import { AuthzError } from "@/lib/authz";
 import { collectJobImageFiles, saveJobImages } from "@/lib/job-images";
 import { LeakFilterError } from "@/lib/leak-filter";
+import { offerSendFailureState } from "@/lib/offer-submit";
 import { adminDemoAllowed, isDemoAdminEmail } from "@/lib/demo-mode";
 import { headers } from "next/headers";
 import { createDataRequest, exportUserData, resolveDataRequest, type DataRequestType } from "@/lib/privacy";
@@ -42,6 +43,10 @@ export type ActionState = {
   error?: string;
   ok?: boolean;
   highlights?: string[];
+  fields?: {
+    amount?: string;
+    message?: string;
+  };
 };
 
 export async function loginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -208,19 +213,27 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
 }
 
 export async function createOfferAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const fields = {
+    amount: String(formData.get("amount") ?? ""),
+    message: String(formData.get("message") ?? ""),
+  };
+  const jobId = String(formData.get("jobId") ?? "");
   try {
     const user = await viewer();
-    const amount = Number(formData.get("amount") || 0);
-    const offer = await createOffer(db, user, {
-      jobId: String(formData.get("jobId") ?? ""),
-      amountOre: nokToOre(amount),
-      message: String(formData.get("message") ?? ""),
+    const result = await createOfferResult(db, user, {
+      jobId,
+      amountOre: nokToOre(Number(formData.get("amount") || 0)),
+      message: fields.message,
     });
-    const conversation = await db.conversation.findFirstOrThrow({ where: { offerId: offer.id } });
-    redirect(`/samtaler/${conversation.id}`);
+    revalidatePath(`/oppdrag/${jobId}`);
+    revalidatePath("/oversikt");
+    if (result.created) {
+      redirect(`/oppdrag/${jobId}?sendt=${result.offer.id}`);
+    }
+    redirect(`/oppdrag/${jobId}`);
   } catch (error) {
     if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
-    return actionError(error);
+    return offerSendFailureState(error, fields);
   }
 }
 

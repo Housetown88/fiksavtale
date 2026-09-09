@@ -178,3 +178,42 @@ a {
   align-items: center;
   justify-content: center;
 }
+
+.offer-success-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  border: none;
+  padding: 0;
+  background: transparent;
+  margin: auto;
+}
+
+.offer-success-dialog::backdrop {
+  background: rgba(22, 54, 45, 0.48);
+}
+
+@keyframes offer-check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  72% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.offer-check-pop {
+  animation: offer-check-pop 480ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offer-check-pop {
+    animation: none;
+  }
+}

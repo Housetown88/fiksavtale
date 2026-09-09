@@ -194,7 +194,7 @@ export default async function OverviewPage() {
                   <p className="font-semibold">{offer.job.title}</p>
                   <p className="text-sm text-ink-soft">{formatNok(offer.amountOre)}</p>
                 </div>
-                <StatusBadge status={offer.status} />
+                <StatusBadge status={offer.status} kind="offer" />
               </Link>
             ))}
           </div>

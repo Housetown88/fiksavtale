@@ -436,15 +436,25 @@ export function OfferForm({
   defaultAmountOre: number;
 }) {
   const [state, action, pending] = useActionState(createOfferAction, {});
-  const [amount, setAmount] = useState(String(Math.round(defaultAmountOre / 100)));
-  const [message, setMessage] = useState("");
+  const [amount, setAmount] = useState(
+    state.fields?.amount ?? String(Math.round(defaultAmountOre / 100)),
+  );
+  const [message, setMessage] = useState(state.fields?.message ?? "");
   const amountOre = Number(amount) > 0 ? nokToOre(Number(amount)) : 0;
   const preview = amountOre > 0 ? calcCommission(amountOre, feeBps) : null;
+  const error = state.error;
 
   return (
     <form action={action} className="grid gap-3">
       <input type="hidden" name="jobId" value={jobId} />
-      <ErrorBox state={state} />
+      {error ? (
+        <ErrorBox
+          state={{
+            error,
+            highlights: state.highlights,
+          }}
+        />
+      ) : null}
       <Field id="offer-amount" label="Fastpris (NOK)">
         <input
           className="field"
@@ -478,8 +488,8 @@ export function OfferForm({
       ) : (
         <p className="text-xs text-ink-soft">Skriv inn pris for å se gebyr og forventet oppgjør.</p>
       )}
-      <button className="btn btn-copper" disabled={pending} type="submit">
-        {pending ? "Sender…" : "Gi tilbud"}
+      <button className="btn btn-copper" disabled={pending} type="submit" aria-busy={pending}>
+        {pending ? "Sender…" : "Send tilbud"}
       </button>
     </form>
   );
