@@ -21,8 +21,8 @@ export async function getJobForViewer(
     where: { id: jobId },
     include: {
       customer: { include: { customerProfile: true } },
-      offers: true,
       booking: true,
+      _count: { select: { offers: true } },
     },
   });
   if (!job) {
@@ -31,32 +31,23 @@ export async function getJobForViewer(
 
   const isOwner = viewer?.id === job.customerId;
   const isAdmin = viewer?.role === "ADMIN";
-  const involvedProvider = viewer
-    ? job.offers.some((offer) => offer.providerId === viewer.id) ||
-      job.booking?.providerId === viewer.id
-    : false;
 
-  if (job.status !== "OPEN" && !isOwner && !isAdmin && !involvedProvider) {
-    throw new AuthzError("Du har ikke tilgang til dette oppdraget", 403);
+  if (job.status !== "OPEN" && !isOwner && !isAdmin) {
+    const involvedProvider = viewer
+      ? job.booking?.providerId === viewer.id ||
+        Boolean(
+          await db.offer.findFirst({
+            where: { jobId: job.id, providerId: viewer.id },
+            select: { id: true },
+          }),
+        )
+      : false;
+    if (!involvedProvider) {
+      throw new AuthzError("Du har ikke tilgang til dette oppdraget", 403);
+    }
   }
 
   return job;
-}
-
-export async function assertCanViewOffers(
-  db: PrismaClient,
-  viewer: Viewer,
-  jobId: string,
-) {
-  const job = await db.job.findUnique({
-    where: { id: jobId },
-    include: { offers: true, booking: true },
-  });
-  if (!job) throw new AuthzError("Oppdraget finnes ikke", 404);
-  if (viewer.role === "ADMIN" || job.customerId === viewer.id) return job;
-  if (job.offers.some((offer) => offer.providerId === viewer.id)) return job;
-  if (job.booking?.providerId === viewer.id) return job;
-  throw new AuthzError("Du har ikke tilgang til tilbudene på dette oppdraget", 403);
 }
 
 export async function getOfferForViewer(
@@ -127,3 +118,5 @@ export function assertRole(viewer: Viewer | null, roles: Role[]): asserts viewer
     throw new AuthzError("Du har ikke tilgang til denne siden", 403);
   }
 }
+
+export { assertCanViewOffers } from "./offer-access";

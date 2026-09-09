@@ -20,3 +20,14 @@ export function initialsFromName(name: string): string {
   if (parts.length === 0) return "?";
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 }
+
+export function formatOsloDateTime(date: Date): string {
+  return new Intl.DateTimeFormat("nb-NO", {
+    timeZone: "Europe/Oslo",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}

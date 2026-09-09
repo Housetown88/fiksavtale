@@ -8,14 +8,30 @@ import { jobTypeFullLabel } from "@/lib/categories";
 import { calcCommission } from "@/lib/money";
 import { getPlatformFeeBps } from "@/lib/settings";
 import { acceptOfferAction } from "@/app/actions";
-import { Alert, OrgBadgeList, PageTitle, StarRating, StatusBadge } from "@/components/ui";
+import { Alert, InitialsAvatar, OrgBadgeList, PageTitle, StarRating, StatusBadge } from "@/components/ui";
 import { OfferForm, ReportForm } from "@/components/forms";
 import { JobImageGallery } from "@/components/JobImages";
 import { formatBudgetRange } from "@/lib/budget";
 import { formatNok } from "@/lib/money";
+import { formatOsloDateTime } from "@/lib/format";
+import { canShowOfferSuccess } from "@/lib/offer-submit";
+import {
+  listOffersForViewer,
+  offerCountFirmsLabel,
+  offerCountReceivedLabel,
+} from "@/lib/offer-access";
+import { OfferSentConfirmation } from "@/components/OfferSentConfirmation";
+import { ProviderSentOffer } from "@/components/ProviderSentOffer";
 
-export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function JobDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ sendt?: string }>;
+}) {
   const { id } = await params;
+  const { sendt } = await searchParams;
   const user = await getCurrentUser();
   let job;
   try {
@@ -27,16 +43,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const isOwner = user?.id === job.customerId;
   const feeBps = await getPlatformFeeBps(db);
   const quoteAmount = job.budgetMaxOre ?? job.budgetMinOre ?? 500_000;
-  const offers = await db.offer.findMany({
-    where: {
-      jobId: job.id,
-      ...(isOwner || user?.role === "ADMIN" ? {} : user ? { providerId: user.id } : { id: "__none__" }),
-    },
-    include: {
-      provider: { include: { providerProfile: true, reviewsReceived: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const listed = await listOffersForViewer(db, user, job.id);
+  const offers = listed.offers;
+  const offerCount = listed.offerCount;
   const contactUnlocked = user ? await canViewerSeeContact(db, { viewerId: user.id, jobId: job.id }) : false;
   const contact = user && contactUnlocked ? await getContactPayload(db, { viewerId: user.id, jobId: job.id }) : null;
   const conversation = user
@@ -51,6 +60,22 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     select: { id: true },
     orderBy: { sortOrder: "asc" },
   });
+  const ownOffer =
+    user?.role === "PROVIDER"
+      ? offers.find((offer) => offer.providerId === user.id)
+      : undefined;
+  const ownPendingOffer = ownOffer?.status === "PENDING" ? ownOffer : undefined;
+  const confirmedSentOffer =
+    user?.role === "PROVIDER" && sendt
+      ? offers.find(
+          (offer) => offer.providerId === user.id && offer.id === sendt && offer.status === "PENDING",
+        )
+      : undefined;
+  const showOfferSuccess = canShowOfferSuccess({
+    sentOfferId: sendt,
+    confirmedOfferId: confirmedSentOffer?.id,
+  });
+  const jobHref = `/oppdrag/${job.id}`;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
@@ -117,74 +142,118 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
         <section className="mt-8">
           <h2 className="font-serif text-2xl">Tilbud</h2>
-          <div className="mt-3 space-y-3">
-            {offers.map((offer) => {
-              const reviewCount = offer.provider.reviewsReceived.length;
-              const rating =
-                reviewCount > 0
-                  ? offer.provider.reviewsReceived.reduce((sum, review) => sum + review.rating, 0) /
-                    reviewCount
-                  : null;
-              return (
-                <div key={offer.id} className="card p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <Link href={`/firma/${offer.provider.id}`} className="font-semibold">
-                        {offer.provider.providerProfile?.companyName ?? offer.provider.name}
-                      </Link>{" "}
-                      {offer.provider.providerProfile ? (
-                        <span className="mt-1 block">
-                          <OrgBadgeList profile={offer.provider.providerProfile} />
-                        </span>
-                      ) : null}
-                      {rating != null ? (
-                        <span className="mt-1 block">
-                          <StarRating rating={rating} count={reviewCount} />
-                        </span>
-                      ) : null}
+          {listed.access === "all" ? (
+            <div className="mt-3 space-y-3">
+              {offers.map((offer) => {
+                const reviewCount = offer.provider.reviewsReceived.length;
+                const rating =
+                  reviewCount > 0
+                    ? offer.provider.reviewsReceived.reduce((sum, review) => sum + review.rating, 0) /
+                      reviewCount
+                    : null;
+                const companyName =
+                  offer.provider.providerProfile?.companyName ?? offer.provider.name;
+                return (
+                  <div key={offer.id} className="card p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-start gap-3">
+                        <InitialsAvatar name={companyName} />
+                        <div>
+                          <Link href={`/firma/${offer.provider.id}`} className="font-semibold">
+                            {companyName}
+                          </Link>{" "}
+                          {offer.provider.providerProfile ? (
+                            <span className="mt-1 block">
+                              <OrgBadgeList profile={offer.provider.providerProfile} />
+                            </span>
+                          ) : null}
+                          {rating != null ? (
+                            <span className="mt-1 block">
+                              <StarRating rating={rating} count={reviewCount} />
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <span className="font-serif text-xl">{formatNok(offer.amountOre)}</span>
                     </div>
-                    <span className="font-serif text-xl">{formatNok(offer.amountOre)}</span>
+                    <p className="mt-2 text-sm">{offer.message}</p>
+                    <p className="mt-2 text-xs text-ink-soft">
+                      Sendt {formatOsloDateTime(offer.createdAt)}. Status:{" "}
+                      <StatusBadge status={offer.status} kind="offer" />. Gebyr{" "}
+                      {formatNok(calcCommission(offer.amountOre, feeBps).platformFeeOre)} trekkes automatisk
+                      ved finansiering.
+                      {job.status === "CANCELLED" && offer.status === "ACCEPTED"
+                        ? " Tilbudet ble godtatt før bookingen ble avbestilt — det er historikk, ikke en aktiv avtale."
+                        : null}
+                    </p>
+                    {isOwner && offer.status === "PENDING" && job.status === "OPEN" ? (
+                      <form action={acceptOfferAction} className="mt-3 space-y-2">
+                        <input type="hidden" name="offerId" value={offer.id} />
+                        <button className="btn btn-copper" type="submit">
+                          Velg tilbud
+                        </button>
+                        <p className="text-xs text-ink-soft">
+                          Planlagt: Vipps-reservasjon på {formatNok(offer.amountOre)}. I preview: ingen ekte
+                          trekk.
+                        </p>
+                      </form>
+                    ) : null}
                   </div>
-                  <p className="mt-2 text-sm">{offer.message}</p>
-                  <p className="mt-2 text-xs text-ink-soft">
-                    Status: <StatusBadge status={offer.status} />. Gebyr{" "}
-                    {formatNok(calcCommission(offer.amountOre, feeBps).platformFeeOre)} trekkes automatisk
-                    ved finansiering.
-                    {job.status === "CANCELLED" && offer.status === "ACCEPTED"
-                      ? " Tilbudet ble godtatt før bookingen ble avbestilt — det er historikk, ikke en aktiv avtale."
-                      : null}
-                  </p>
-                  {isOwner && offer.status === "PENDING" && job.status === "OPEN" ? (
-                    <form action={acceptOfferAction} className="mt-3 space-y-2">
-                      <input type="hidden" name="offerId" value={offer.id} />
-                      <button className="btn btn-copper" type="submit">
-                        Velg tilbud
-                      </button>
-                      <p className="text-xs text-ink-soft">
-                        Planlagt: Vipps-reservasjon på {formatNok(offer.amountOre)}. I preview: ingen ekte
-                        trekk.
-                      </p>
-                    </form>
-                  ) : null}
-                </div>
-              );
-            })}
-            {offers.length === 0 ? <p className="text-sm text-ink-soft">Ingen synlige tilbud ennå.</p> : null}
-          </div>
+                );
+              })}
+              {offers.length === 0 ? <p className="text-sm text-ink-soft">Ingen tilbud ennå.</p> : null}
+            </div>
+          ) : listed.access === "own" ? (
+            <div className="mt-3 space-y-3">
+              <p className="text-sm text-ink-soft">{offerCountReceivedLabel(offerCount)}</p>
+              <a href="#mitt-tilbud" className="btn btn-secondary">
+                Se tilbudet mitt
+              </a>
+            </div>
+          ) : listed.access === "count" ? (
+            <p className="mt-3 text-sm text-ink-soft">{offerCountFirmsLabel(offerCount)}</p>
+          ) : (
+            <p className="mt-3 text-sm text-ink-soft">
+              Tilbudene er private mellom kunden og hver bedrift.
+            </p>
+          )}
         </section>
       </div>
 
       <aside className="space-y-4">
-        {user?.role === "PROVIDER" && job.status === "OPEN" ? (
+        {showOfferSuccess && confirmedSentOffer ? (
+          <OfferSentConfirmation
+            jobTitle={job.title}
+            amountLabel={formatNok(confirmedSentOffer.amountOre)}
+            sentAtLabel={formatOsloDateTime(confirmedSentOffer.createdAt)}
+            jobHref={jobHref}
+          />
+        ) : null}
+        {ownPendingOffer ? (
+          <ProviderSentOffer
+            amountOre={ownPendingOffer.amountOre}
+            message={ownPendingOffer.message}
+            sentAtLabel={formatOsloDateTime(ownPendingOffer.createdAt)}
+            status={ownPendingOffer.status}
+          />
+        ) : user?.role === "PROVIDER" && job.status === "OPEN" ? (
           <div className="card p-5">
-            <h2 className="font-serif text-xl tracking-tight">Gi tilbud</h2>
+            <h2 className="font-serif text-xl tracking-tight">Send tilbud</h2>
             <p className="mt-1 text-sm text-ink-soft">
               Kunden ser totalen. Dere ser gebyr og forventet oppgjør mens dere skriver prisen.
             </p>
+            <p className="mt-2 text-sm font-semibold text-pine">{offerCountFirmsLabel(offerCount)}</p>
             <div className="mt-3">
               <OfferForm jobId={job.id} feeBps={feeBps} defaultAmountOre={quoteAmount} />
             </div>
           </div>
+        ) : ownOffer ? (
+          <ProviderSentOffer
+            amountOre={ownOffer.amountOre}
+            message={ownOffer.message}
+            sentAtLabel={formatOsloDateTime(ownOffer.createdAt)}
+            status={ownOffer.status}
+          />
         ) : null}
         {!user ? (
           <Alert>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRelativeNb, initialsFromName } from "../format";
+import { formatRelativeNb, formatOsloDateTime, initialsFromName } from "../format";
 
 describe("formatRelativeNb", () => {
   it("beskriver nettopp publisert tid", () => {
@@ -19,5 +19,14 @@ describe("initialsFromName", () => {
 
   it("tåler tomt navn", () => {
     expect(initialsFromName("")).toBe("?");
+  });
+});
+
+describe("formatOsloDateTime", () => {
+  it("viser dato og klokke i Europe/Oslo", () => {
+    const label = formatOsloDateTime(new Date("2026-01-15T12:00:00.000Z"));
+    expect(label).toMatch(/15/);
+    expect(label).toMatch(/2026/);
+    expect(label).toMatch(/13[:.]00/);
   });
 });

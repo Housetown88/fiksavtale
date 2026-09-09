@@ -15,8 +15,8 @@ export default async function OverviewPage() {
   if (!user) redirect("/logg-inn");
 
   const jobs = await db.job.findMany({
-    where: user.role === "CUSTOMER" ? { customerId: user.id } : undefined,
-    include: { booking: true, offers: true },
+    where: user.role === "CUSTOMER" ? { customerId: user.id } : user.role === "ADMIN" ? undefined : { id: "__none__" },
+    include: { booking: true, _count: { select: { offers: true } } },
     orderBy: { createdAt: "desc" },
     take: user.role === "PROVIDER" ? 8 : 20,
   });
@@ -175,7 +175,7 @@ export default async function OverviewPage() {
                 <Link key={job.id} href={`/oppdrag/${job.id}`} className="card card-link flex items-center justify-between gap-3 p-4">
                   <div>
                     <p className="font-semibold">{job.title}</p>
-                    <p className="text-sm text-ink-soft">{job.offers.length} tilbud</p>
+                    <p className="text-sm text-ink-soft">{job._count.offers} tilbud</p>
                   </div>
                   <StatusBadge status={job.status} />
                 </Link>
@@ -194,7 +194,7 @@ export default async function OverviewPage() {
                   <p className="font-semibold">{offer.job.title}</p>
                   <p className="text-sm text-ink-soft">{formatNok(offer.amountOre)}</p>
                 </div>
-                <StatusBadge status={offer.status} />
+                <StatusBadge status={offer.status} kind="offer" />
               </Link>
             ))}
           </div>

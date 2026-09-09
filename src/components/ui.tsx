@@ -4,6 +4,7 @@ import { jobTypeFullLabel } from "@/lib/categories";
 import { formatRelativeNb, initialsFromName } from "@/lib/format";
 import { formatNok } from "@/lib/money";
 import { statusLabelNb } from "@/lib/status-labels";
+import { offerStatusLabelNb } from "@/lib/offer-submit";
 import { orgBadges } from "@/lib/org-badges";
 
 export function PageTitle({
@@ -70,8 +71,16 @@ const STATUS_TONE: Record<string, string> = {
   EXPIRED: "bg-sand text-ink-soft",
 };
 
-export function StatusBadge({ status, showRaw }: { status: string; showRaw?: boolean }) {
-  const label = statusLabelNb(status);
+export function StatusBadge({
+  status,
+  showRaw,
+  kind,
+}: {
+  status: string;
+  showRaw?: boolean;
+  kind?: "default" | "offer";
+}) {
+  const label = kind === "offer" ? offerStatusLabelNb(status) : statusLabelNb(status);
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_TONE[status] ?? "bg-sand text-pine"}`}

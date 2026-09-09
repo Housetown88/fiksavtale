@@ -10,14 +10,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const { id } = await params;
     const user = await getCurrentUser();
     const job = await getJobForViewer(db, user, id);
-    return NextResponse.json(toPublicJob({
-      ...job,
-      customer: {
-        id: job.customer.id,
-        name: job.customer.name,
-        customerProfile: job.customer.customerProfile,
-      },
-    }));
+    return NextResponse.json({
+      ...toPublicJob({
+        ...job,
+        customer: {
+          id: job.customer.id,
+          name: job.customer.name,
+          customerProfile: job.customer.customerProfile,
+        },
+      }),
+      offerCount: job._count.offers,
+    });
   } catch (error) {
     return NextResponse.json({ error: errorMessage(error) }, { status: errorStatus(error) });
   }
