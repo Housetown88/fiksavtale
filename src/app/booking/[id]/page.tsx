@@ -12,10 +12,12 @@ import {
 } from "@/app/actions";
 import { Alert, PageTitle, PriceBreakdown, StatusBadge } from "@/components/ui";
 import { CancelForm, ExtraForm, ReviewForm } from "@/components/forms";
+import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { CheckoutPaymentCopy, PlannedVippsProviderCopy } from "@/components/PaymentCopy";
 import { describeBookingMoney, extraImpact } from "@/lib/booking-totals";
 import { formatNok } from "@/lib/money";
 import { statusLabelNb } from "@/lib/status-labels";
+import { LEDGER } from "@/lib/ledger";
 
 export default async function BookingPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -31,7 +33,12 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const review = await db.review.findUnique({ where: { bookingId: booking.id } });
   const contact = await getContactPayload(db, { viewerId: user.id, jobId: booking.jobId });
   const job = await db.job.findUniqueOrThrow({ where: { id: booking.jobId } });
-  const isCancelled = booking.status === "CANCELLED";
+  const disputeHold = moneyNeedsLedger(booking.status)
+    ? await db.settlementEntry.findFirst({
+        where: { bookingId: booking.id, type: LEDGER.DISPUTE_HOLD },
+        orderBy: { createdAt: "desc" },
+      })
+    : null;
   const isCustomer = user.id === booking.customerId;
   const isProvider = user.id === booking.providerId;
   const money = describeBookingMoney({
@@ -41,7 +48,8 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
     status: booking.status,
     refundedOre: booking.refundedOre,
   });
-  const succeededPayment = booking.payments.some((payment) => payment.status === "SUCCEEDED");
+  const showRefundCard =
+    money.isCancelled || money.isRefunded || money.isDisputed || money.refundedOre > 0;
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -49,30 +57,47 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         <PageTitle kicker="Booking" title={job.title}>
           <StatusBadge status={booking.status} />
         </PageTitle>
-        {isCancelled ? (
+        {money.isCancelled ? (
           <Alert tone="warn">
             Bookingen er avbestilt. Tilbudet som ble valgt står fortsatt som godtatt i historikken — det er
             ikke en aktiv avtale. Summene under er historikk, ikke et betalingskrav.
           </Alert>
         ) : null}
+        {money.isDisputed ? (
+          <Alert tone="warn">
+            Bookingen er i tvist etter avbestilling etter start. Oppgjør holdes. Kontakt forblir synlig
+            fordi den allerede er delt. Ingen ekte Vipps-tilbakebetaling skjer i DEMO.
+          </Alert>
+        ) : null}
+        {money.inconsistentUnpaidApproved ? (
+          <Alert tone="warn">
+            Avvik: status er {statusLabelNb(booking.status)}, men godkjente tillegg på{" "}
+            {formatNok(money.extrasApprovedUnpaidOre)} er ubetalt. Nye fullføringer blokkeres til tilleggene
+            er betalt. Dette telles ikke som «gjenstår å betale».
+          </Alert>
+        ) : null}
         <div className="mt-3">
           <PriceBreakdown view={money} audience={isProvider ? "provider" : "customer"} />
         </div>
-        {isCancelled ? (
+        {showRefundCard ? (
           <div className="card mt-3 space-y-2 p-4 text-sm">
+            <h2 className="font-semibold">{money.refund.headline}</h2>
             <p>
-              Historisk avtalesum: <strong>{formatNok(money.agreedOre + money.extrasPaidOre)}</strong>
-              {money.extrasPaidOre > 0
-                ? ` (opprinnelig jobbpris ${formatNok(money.agreedOre)} + betalte tillegg ${formatNok(money.extrasPaidOre)})`
-                : ` (opprinnelig jobbpris)`}
+              Beløp:{" "}
+              <strong>
+                {formatNok(money.refund.status === "pending" ? money.refund.heldOre : money.refund.amountOre)}
+              </strong>
+              {" · "}
+              Status: <strong>{money.refund.statusLabel}</strong>
             </p>
-            {succeededPayment || money.refundedOre > 0 ? (
+            {money.refund.status === "pending" ? (
               <p>
-                {money.refundLabel} DEMO-refusjon er en post i oppgjørsboken, ikke et ekte Vipps-tilbake.
+                Holdes i oppgjørsboken
+                {disputeHold ? ` (${formatNok(disputeHold.amountOre)})` : ""}. Ingen DEMO-refusjon er
+                bokført ennå.
               </p>
-            ) : (
-              <p>Ingenting gjenstår å betale. Ingen penger ble finansiert.</p>
-            )}
+            ) : null}
+            <p>{money.refund.detail}</p>
             {booking.cancelReason ? <p>Grunn: {booking.cancelReason}</p> : null}
           </div>
         ) : null}
@@ -83,13 +108,13 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
               <CheckoutPaymentCopy amountLabel={formatNok(booking.amountOre)} />
               <form action={startDemoPaymentAction}>
                 <input type="hidden" name="bookingId" value={booking.id} />
-                <button className="btn btn-copper" type="submit">
+                <PendingSubmitButton className="btn btn-copper" pendingLabel="Starter…">
                   Bekreft og fortsett (DEMO — ingen ekte trekk)
-                </button>
+                </PendingSubmitButton>
               </form>
             </div>
           ) : null}
-          {isProvider && !isCancelled ? (
+          {isProvider && !money.isClosed ? (
             <div className="card space-y-2 p-5">
               <h2 className="font-serif text-xl">Oppgjør (planlagt)</h2>
               <div className="text-sm text-ink-soft">
@@ -105,9 +130,9 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           {booking.status === "PAID" && isProvider ? (
             <form action={startWorkAction}>
               <input type="hidden" name="bookingId" value={booking.id} />
-              <button className="btn btn-primary" type="submit">
+              <PendingSubmitButton className="btn btn-primary" pendingLabel="Lagrer…">
                 Marker arbeid startet
-              </button>
+              </PendingSubmitButton>
             </form>
           ) : null}
           {(booking.status === "IN_PROGRESS" || booking.status === "PAID") && isCustomer ? (
@@ -119,9 +144,9 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
               ) : (
                 <form action={completeBookingAction}>
                   <input type="hidden" name="bookingId" value={booking.id} />
-                  <button className="btn btn-primary" type="submit">
+                  <PendingSubmitButton className="btn btn-primary" pendingLabel="Godkjenner…">
                     Godkjenn ferdig arbeid
-                  </button>
+                  </PendingSubmitButton>
                 </form>
               )}
               <p className="text-xs text-ink-soft">
@@ -174,7 +199,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
                     </div>
                     <StatusBadge status={extra.status} />
                   </div>
-                  {isCustomer && extra.status === "PROPOSED" ? (
+                  {isCustomer && extra.status === "PROPOSED" && !money.isClosed ? (
                     <form action={decideExtraAction} className="mt-3 space-y-2">
                       <input type="hidden" name="extraId" value={extra.id} />
                       <p className="text-xs text-ink-soft">
@@ -182,35 +207,48 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
                         deretter bekrefte DEMO-betaling før tillegget teller som betalt.
                       </p>
                       <div className="flex gap-1">
-                        <button className="btn btn-primary px-3 py-1 text-xs" name="decision" value="APPROVED">
+                        <PendingSubmitButton
+                          className="btn btn-primary px-3 py-1 text-xs"
+                          pendingLabel="Lagrer…"
+                          name="decision"
+                          value="APPROVED"
+                        >
                           Godkjenn
-                        </button>
-                        <button className="btn btn-secondary px-3 py-1 text-xs" name="decision" value="REJECTED">
+                        </PendingSubmitButton>
+                        <PendingSubmitButton
+                          className="btn btn-secondary px-3 py-1 text-xs"
+                          pendingLabel="Lagrer…"
+                          name="decision"
+                          value="REJECTED"
+                        >
                           Avslå
-                        </button>
+                        </PendingSubmitButton>
                       </div>
                     </form>
                   ) : null}
-                  {isCustomer && extra.status === "APPROVED" && !isCancelled ? (
+                  {isCustomer && extra.status === "APPROVED" && !money.isClosed ? (
                     <form action={startDemoPaymentAction} className="mt-3">
                       <input type="hidden" name="bookingId" value={booking.id} />
                       <input type="hidden" name="extraChargeId" value={extra.id} />
-                      <button className="btn btn-copper" type="submit">
+                      <PendingSubmitButton className="btn btn-copper" pendingLabel="Starter…">
                         Betal tillegg (DEMO) — {formatNok(extra.amountOre)}
-                      </button>
+                      </PendingSubmitButton>
                     </form>
                   ) : null}
                   {extra.status === "APPROVED" ? (
                     <p className="mt-2 text-xs text-ink-soft">
                       Status: {statusLabelNb("APPROVED")}. Teller ikke som finansiert før betaling er
                       bekreftet.
+                      {money.isClosed
+                        ? " Bookingen er avsluttet, så tillegget kan ikke betales her."
+                        : ""}
                     </p>
                   ) : null}
                 </li>
               );
             })}
           </ul>
-          {isProvider && !isCancelled && ["PAID", "IN_PROGRESS"].includes(booking.status) ? (
+          {isProvider && !money.isClosed && ["PAID", "IN_PROGRESS"].includes(booking.status) ? (
             <div className="mt-3">
               <ExtraForm bookingId={booking.id} />
             </div>
@@ -225,11 +263,12 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         {review ? (
           <Alert tone="ok">Anmeldelse: {review.rating}/5 — {review.comment}</Alert>
         ) : null}
-        {!isCancelled && booking.status !== "COMPLETED" && booking.status !== "REFUNDED" ? (
+        {!money.isClosed ? (
           <div className="card p-5">
             <h2 className="font-serif text-xl">Avbestill</h2>
             <p className="mb-2 text-sm text-ink-soft">
               Se også <Link href="/avbestilling" className="underline">avbestillingsreglene</Link>.
+              Etter start settes bookingen i tvist og finansierte beløp holdes (DEMO-refusjon venter).
             </p>
             <CancelForm bookingId={booking.id} />
           </div>
@@ -237,4 +276,8 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
       </div>
     </div>
   );
+}
+
+function moneyNeedsLedger(status: string) {
+  return status === "DISPUTED";
 }

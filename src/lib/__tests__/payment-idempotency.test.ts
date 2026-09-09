@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@prisma/client";
 import { createTestUsers, setupTestDb } from "./helpers";
 import { acceptOffer, createJob, createOffer } from "../domain";
-import { createPaymentIntent, handlePaymentWebhook } from "../payments";
+import { createPaymentIntent, demoPaymentEventId, handlePaymentWebhook } from "../payments";
 
 let db: PrismaClient;
 
@@ -70,5 +70,42 @@ describe("betalingswebhook", () => {
     });
     expect(succeeded).toHaveLength(2);
     expect(await db.booking.count({ where: { jobId: job.id } })).toBe(1);
+  });
+
+  it("gjenbruker ventende intensjon og stabil DEMO-hendelses-id", async () => {
+    const users = await createTestUsers(db);
+    const job = await createJob(db, { id: users.customer.id, role: "CUSTOMER" }, {
+      title: "Dobbel bekreftelse",
+      description: "Skal ikke lage to intensjoner.",
+      category: "elektriker",
+      area: "Tøyen",
+    });
+    const offer = await createOffer(db, { id: users.provider.id, role: "PROVIDER" }, {
+      jobId: job.id,
+      amountOre: 150_000,
+      message: "Fastpris uten kontakt.",
+    });
+    const booking = await acceptOffer(db, { id: users.customer.id, role: "CUSTOMER" }, offer.id);
+    const first = await createPaymentIntent(db, booking.id);
+    const second = await createPaymentIntent(db, booking.id);
+    expect(second.id).toBe(first.id);
+
+    const eventId = demoPaymentEventId(first.id, "payment.succeeded");
+    expect(eventId).toBe(demoPaymentEventId(first.id, "payment.succeeded"));
+    const firstPay = await handlePaymentWebhook(db, {
+      eventId,
+      type: "payment.succeeded",
+      paymentIntentId: first.id,
+      bookingId: booking.id,
+    });
+    const secondPay = await handlePaymentWebhook(db, {
+      eventId,
+      type: "payment.succeeded",
+      paymentIntentId: first.id,
+      bookingId: booking.id,
+    });
+    expect(firstPay.idempotentReplay).toBe(false);
+    expect(secondPay.idempotentReplay).toBe(true);
+    expect(await db.payment.count({ where: { bookingId: booking.id } })).toBe(1);
   });
 });

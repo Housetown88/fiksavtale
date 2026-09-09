@@ -10,7 +10,7 @@ import {
   proposeExtra,
 } from "../domain";
 import { createPaymentIntent, handlePaymentWebhook } from "../payments";
-import { extraImpact, summarizeBookingMoney } from "../booking-totals";
+import { extraImpact, summarizeBookingMoney, describeBookingMoney } from "../booking-totals";
 
 let db: PrismaClient;
 
@@ -81,6 +81,8 @@ describe("tillegg", () => {
     ).rejects.toThrow(/betales/);
 
     const extraIntent = await createPaymentIntent(db, booking.id, { extraChargeId: extra.id });
+    const extraIntentAgain = await createPaymentIntent(db, booking.id, { extraChargeId: extra.id });
+    expect(extraIntentAgain.id).toBe(extraIntent.id);
     await handlePaymentWebhook(db, {
       eventId: `extra_pay_${extraIntent.id}`,
       type: "payment.succeeded",
@@ -96,5 +98,31 @@ describe("tillegg", () => {
     const done = await db.booking.findUniqueOrThrow({ where: { id: booking.id } });
     expect(done.status).toBe("COMPLETED");
     expect(done.amountOre).toBe(150_000);
+  });
+
+  it("blokkerer ny fullføring og flagger historisk avvik hvis APPROVED-tillegg finnes på COMPLETED", async () => {
+    const { users, booking } = await paidBooking();
+    await completeBooking(db, { id: users.customer.id, role: "CUSTOMER" }, booking.id);
+    await db.extraCharge.create({
+      data: {
+        bookingId: booking.id,
+        title: "Historisk ubetalt tillegg",
+        amountOre: 20_000,
+        status: "APPROVED",
+      },
+    });
+    await expect(
+      completeBooking(db, { id: users.customer.id, role: "CUSTOMER" }, booking.id),
+    ).rejects.toThrow(/tilstanden/);
+
+    const extras = await db.extraCharge.findMany({ where: { bookingId: booking.id } });
+    const view = describeBookingMoney({
+      agreedOre: 150_000,
+      extras,
+      platformFeeBps: 1000,
+      status: "COMPLETED",
+    });
+    expect(view.remainingToPayOre).toBe(0);
+    expect(view.inconsistentUnpaidApproved).toBe(true);
   });
 });

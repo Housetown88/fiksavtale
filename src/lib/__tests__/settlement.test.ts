@@ -15,6 +15,7 @@ import {
 import { createPaymentIntent, expireStalePaymentIntents, handlePaymentWebhook, refundBooking } from "../payments";
 import { LEDGER, ledgerSnapshot } from "../ledger";
 import { canViewerSeeContact } from "../contact";
+import { describeBookingMoney } from "../booking-totals";
 
 let db: PrismaClient;
 
@@ -103,6 +104,17 @@ describe("oppgjørsbok og avbestilling", () => {
       where: { bookingId: booking.id, type: LEDGER.DISPUTE_HOLD },
     });
     expect(hold).toBeTruthy();
+    expect(disputed.refundedOre).toBe(0);
+    const view = describeBookingMoney({
+      agreedOre: disputed.amountOre,
+      extras: [],
+      platformFeeBps: disputed.platformFeeBps,
+      status: disputed.status,
+      refundedOre: disputed.refundedOre,
+    });
+    expect(view.refund.status).toBe("pending");
+    expect(view.remainingToPayOre).toBe(0);
+    expect(view.refund.heldOre).toBe(disputed.amountOre);
   });
 
   it("justerer gebyr ved delvis refusjon", async () => {

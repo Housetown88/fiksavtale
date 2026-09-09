@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import sharp from "sharp";
 import {
+  JOB_IMAGE_TYPE_ERROR,
   JOB_IMAGE_TYPES,
   MAX_JOB_IMAGE_BYTES,
   MAX_JOB_IMAGES,
@@ -53,7 +54,7 @@ export async function processJobImage(input: Buffer): Promise<{
   sizeBytes: number;
 }> {
   if (!looksLikeSupportedImage(input)) {
-    throw new JobImageError("Bare JPEG, PNG og WebP er tillatt.");
+    throw new JobImageError(JOB_IMAGE_TYPE_ERROR);
   }
   if (input.length > MAX_JOB_IMAGE_BYTES) {
     throw new JobImageError(`Hvert bilde kan være maks ${MAX_JOB_IMAGE_BYTES / (1024 * 1024)} MB.`);
@@ -95,8 +96,8 @@ export async function saveJobImages(db: PrismaClient, jobId: string, files: File
     if (file.size > MAX_JOB_IMAGE_BYTES) {
       throw new JobImageError(`Hvert bilde kan være maks ${MAX_JOB_IMAGE_BYTES / (1024 * 1024)} MB.`);
     }
-    if (!JOB_IMAGE_TYPES.includes(file.type as (typeof JOB_IMAGE_TYPES)[number])) {
-      throw new JobImageError("Bare JPEG, PNG og WebP er tillatt.");
+    if (file.type && !JOB_IMAGE_TYPES.includes(file.type as (typeof JOB_IMAGE_TYPES)[number])) {
+      throw new JobImageError(JOB_IMAGE_TYPE_ERROR);
     }
     const processed = await processJobImage(Buffer.from(await file.arrayBuffer()));
     await db.jobImage.create({

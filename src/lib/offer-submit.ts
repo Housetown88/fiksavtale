@@ -26,6 +26,17 @@ export function canShowOfferSuccess(input: {
   );
 }
 
+export function canShowOfferAlreadyExists(input: {
+  existingOfferId: string | null | undefined;
+  confirmedOfferId: string | null | undefined;
+}): boolean {
+  return Boolean(
+    input.existingOfferId &&
+      input.confirmedOfferId &&
+      input.existingOfferId === input.confirmedOfferId,
+  );
+}
+
 export type OfferFormFields = {
   amount: string;
   message: string;

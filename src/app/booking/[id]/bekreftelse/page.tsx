@@ -6,6 +6,7 @@ import { getBookingForViewer } from "@/lib/authz";
 import { getContactPayload } from "@/lib/contact";
 import { simulateWebhookAction, startDemoPaymentAction } from "@/app/actions";
 import { Alert, PageTitle, StatusBadge } from "@/components/ui";
+import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { demoIntentBadgeStatus, paymentConfirmView } from "@/lib/payment-status-ui";
 import { describeBookingMoney } from "@/lib/booking-totals";
 import { formatNok } from "@/lib/money";
@@ -120,25 +121,25 @@ export default async function PaymentConfirmPage({
               <input type="hidden" name="bookingId" value={booking.id} />
               <input type="hidden" name="intentId" value={intent} />
               <input type="hidden" name="outcome" value="succeeded" />
-              <button className="btn btn-primary" type="submit">
+              <PendingSubmitButton className="btn btn-primary" pendingLabel="Bekrefter…">
                 Bekreft DEMO-betaling
-              </button>
+              </PendingSubmitButton>
             </form>
             <form action={simulateWebhookAction}>
               <input type="hidden" name="bookingId" value={booking.id} />
               <input type="hidden" name="intentId" value={intent} />
               <input type="hidden" name="outcome" value="failed" />
-              <button className="btn btn-secondary" type="submit">
+              <PendingSubmitButton className="btn btn-secondary" pendingLabel="Simulerer…">
                 Simuler feilet
-              </button>
+              </PendingSubmitButton>
             </form>
             <form action={simulateWebhookAction}>
               <input type="hidden" name="bookingId" value={booking.id} />
               <input type="hidden" name="intentId" value={intent} />
               <input type="hidden" name="outcome" value="cancelled" />
-              <button className="btn btn-secondary" type="submit">
+              <PendingSubmitButton className="btn btn-secondary" pendingLabel="Simulerer…">
                 Simuler avbrutt
-              </button>
+              </PendingSubmitButton>
             </form>
           </div>
         ) : null}
@@ -149,27 +150,27 @@ export default async function PaymentConfirmPage({
               <input type="hidden" name="intentId" value={intent} />
               <input type="hidden" name="extraChargeId" value={extraCharge.id} />
               <input type="hidden" name="outcome" value="succeeded" />
-              <button className="btn btn-primary" type="submit">
+              <PendingSubmitButton className="btn btn-primary" pendingLabel="Bekrefter…">
                 Bekreft DEMO-betaling
-              </button>
+              </PendingSubmitButton>
             </form>
             <form action={simulateWebhookAction}>
               <input type="hidden" name="bookingId" value={booking.id} />
               <input type="hidden" name="intentId" value={intent} />
               <input type="hidden" name="extraChargeId" value={extraCharge.id} />
               <input type="hidden" name="outcome" value="failed" />
-              <button className="btn btn-secondary" type="submit">
+              <PendingSubmitButton className="btn btn-secondary" pendingLabel="Simulerer…">
                 Simuler feilet
-              </button>
+              </PendingSubmitButton>
             </form>
             <form action={simulateWebhookAction}>
               <input type="hidden" name="bookingId" value={booking.id} />
               <input type="hidden" name="intentId" value={intent} />
               <input type="hidden" name="extraChargeId" value={extraCharge.id} />
               <input type="hidden" name="outcome" value="cancelled" />
-              <button className="btn btn-secondary" type="submit">
+              <PendingSubmitButton className="btn btn-secondary" pendingLabel="Simulerer…">
                 Simuler avbrutt
-              </button>
+              </PendingSubmitButton>
             </form>
           </div>
         ) : null}
@@ -177,9 +178,9 @@ export default async function PaymentConfirmPage({
           <form action={startDemoPaymentAction}>
             <input type="hidden" name="bookingId" value={booking.id} />
             {extraCharge ? <input type="hidden" name="extraChargeId" value={extraCharge.id} /> : null}
-            <button className="btn btn-copper" type="submit">
+            <PendingSubmitButton className="btn btn-copper" pendingLabel="Starter…">
               Prøv igjen (DEMO)
-            </button>
+            </PendingSubmitButton>
           </form>
         ) : null}
         <p className="text-xs text-ink-soft">DEMO — ingen ekte Vipps-trekk.</p>

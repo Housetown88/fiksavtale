@@ -26,7 +26,7 @@ import {
 } from "@/lib/domain";
 import { errorMessage } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/audit";
-import { createPaymentIntent, confirmDemoPayment } from "@/lib/payments";
+import { createPaymentIntent, confirmDemoPayment, demoPaymentEventId } from "@/lib/payments";
 import { jobFormFailureState, jobFormFieldsFromFormData } from "@/lib/job-form-state";
 import type { JobFormFields } from "@/lib/job-form-state";
 import { nokToOre } from "@/lib/money";
@@ -232,7 +232,7 @@ export async function createOfferAction(_prev: ActionState, formData: FormData):
     if (result.created) {
       redirect(`/oppdrag/${jobId}?sendt=${result.offer.id}`);
     }
-    redirect(`/oppdrag/${jobId}`);
+    redirect(`/oppdrag/${jobId}?finnes=${result.offer.id}`);
   } catch (error) {
     if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
     return offerSendFailureState(error, fields);
@@ -377,7 +377,7 @@ export async function simulateWebhookAction(formData: FormData) {
         : "payment.succeeded";
   const extraChargeId = String(formData.get("extraChargeId") ?? "") || undefined;
   await confirmDemoPayment(db, {
-    eventId: `demo_${intentId}_${type}_${Date.now()}`,
+    eventId: demoPaymentEventId(intentId, type),
     type,
     paymentIntentId: intentId,
     bookingId,

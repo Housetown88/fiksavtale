@@ -19,7 +19,10 @@ export default function CancelPage() {
           DEMO-refusjon og justerer provisjonen automatisk. Ekte Vipps-tilbakebetaling er ikke koblet.
         </li>
         <li>
-          <strong>Etter at arbeidet er startet:</strong> Forholdsmessig oppgjør eller tvist. Angrerett
+          <strong>Etter at arbeidet er startet:</strong> Avbestilling setter bookingen i tvist.
+          Finansierte beløp (inkl. betalte tillegg) holdes i oppgjørsboken. I DEMO vises
+          «DEMO-refusjon: venter» — ingen refusjon er bokført ennå, og det skjer ingen ekte
+          Vipps-tilbakebetaling. Kontakt forblir synlig fordi den allerede er delt. Angrerett
           gjelder der loven krever det — dette er ikke avklart juridisk i prototypen. Automatisk gebyr
           ved udeblivelse er ikke implementert.
         </li>

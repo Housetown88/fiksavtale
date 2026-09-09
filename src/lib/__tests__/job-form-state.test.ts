@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LeakFilterError } from "../leak-filter";
+import { JobImageError } from "../job-images";
+import { JOB_IMAGE_TYPE_ERROR } from "../job-image-limits";
 import {
   applyJobCategoryChange,
   jobFormFailureState,
@@ -60,5 +62,11 @@ describe("jobbskjema ved valideringsfeil", () => {
     const other = applyJobCategoryChange(current, "rorlegger");
     expect(other.subcategory).toBe("");
     expect(other.category).toBe("rorlegger");
+  });
+
+  it("viser avvist filtype som synlig skjemafeil", () => {
+    const state = jobFormFailureState(new JobImageError(JOB_IMAGE_TYPE_ERROR), belysningFields());
+    expect(state.error).toBe(JOB_IMAGE_TYPE_ERROR);
+    expect(state.fields.title).toBe("Nye spotter i stua");
   });
 });

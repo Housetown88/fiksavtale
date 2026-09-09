@@ -57,6 +57,39 @@ describe("opprettelse av tilbud", () => {
     expect(count).toBe(1);
   });
 
+  it("oppretter bare ett tilbud ved to samtidige innsendinger", async () => {
+    const users = await createTestUsers(db);
+    const job = await createJob(
+      db,
+      { id: users.customer.id, role: "CUSTOMER" },
+      {
+        title: "Dobbeltsend",
+        description: "Skal bare lagre ett tilbud.",
+        category: "maling",
+        area: "Frogner",
+      },
+    );
+    const viewer = { id: users.provider.id, role: "PROVIDER" as const };
+    const results = await Promise.all([
+      createOfferResult(db, viewer, {
+        jobId: job.id,
+        amountOre: 300_000,
+        message: "Første innsending uten kontakt.",
+      }),
+      createOfferResult(db, viewer, {
+        jobId: job.id,
+        amountOre: 400_000,
+        message: "Andre innsending som ikke skal bli et nytt tilbud.",
+      }),
+    ]);
+    const created = results.filter((item) => item.created);
+    expect(created.length).toBeLessThanOrEqual(1);
+    expect(results[0]?.offer.id).toBe(results[1]?.offer.id);
+    expect(
+      await db.offer.count({ where: { jobId: job.id, providerId: users.provider.id } }),
+    ).toBe(1);
+  });
+
   it("lar createOffer fortsette å returnere selve tilbudet", async () => {
     const users = await createTestUsers(db);
     const job = await createJob(
