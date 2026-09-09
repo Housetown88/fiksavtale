@@ -53,7 +53,7 @@ export default async function PaymentConfirmPage({
         </p>
         {paymentIntent ? (
           <p>
-            DEMO-bekreftelse:{" "}
+            DEMO-økt:{" "}
             <StatusBadge
               status={demoIntentBadgeStatus({
                 intentStatus: paymentIntent.status,

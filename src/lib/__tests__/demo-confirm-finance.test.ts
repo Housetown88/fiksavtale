@@ -4,9 +4,11 @@ import { createTestUsers, setupTestDb } from "./helpers";
 import { acceptOffer, createJob, createOffer, markWorkStarted } from "../domain";
 import { canViewerSeeContact, getContactPayload } from "../contact";
 import {
+  applySucceededReservationFinance,
   confirmDemoPayment,
   createPaymentIntent,
   handlePaymentWebhook,
+  repairUnfinancedSucceededReservations,
 } from "../payments";
 import { describeBookingMoney } from "../booking-totals";
 import { LEDGER } from "../ledger";
@@ -217,6 +219,155 @@ describe("DEMO-bekreftelse finansierer bookingen", () => {
     expect(after.contactUnlockedAt).not.toBeNull();
     expect(await canViewerSeeContact(db, { viewerId: users.provider.id, jobId: job.id })).toBe(true);
 
+    const charges = await db.settlementEntry.findMany({
+      where: { bookingId: booking.id, type: LEDGER.CHARGE, extraChargeId: null },
+    });
+    expect(charges).toHaveLength(1);
+  });
+
+  it("produksjonsform: RESERVATION SUCCEEDED + PENDING_PAYMENT finansieres ved DEMO-bekreftelse", async () => {
+    const users = await createTestUsers(db);
+    const job = await createJob(db, { id: users.customer.id, role: "CUSTOMER" }, {
+      title: "Fastlåst DEMO-booking",
+      description: "Belysning. Produksjonsform uten finansiering.",
+      category: "elektriker",
+      area: "Grünerløkka",
+      addressLine: "Markveien 12",
+    });
+    const offer = await createOffer(db, { id: users.provider.id, role: "PROVIDER" }, {
+      jobId: job.id,
+      amountOre: 150_000,
+      message: "Fastpris inkludert materiell.",
+    });
+    const booking = await acceptOffer(db, { id: users.customer.id, role: "CUSTOMER" }, offer.id);
+    const intent = await createPaymentIntent(db, booking.id);
+    await db.paymentIntent.update({
+      where: { id: intent.id },
+      data: { status: "SUCCEEDED", kind: "RESERVATION" },
+    });
+    await db.payment.create({
+      data: {
+        bookingId: booking.id,
+        paymentIntentId: intent.id,
+        eventId: `stuck_evt_${intent.id}`,
+        amountOre: 150_000,
+        status: "SUCCEEDED",
+        rawPayload: JSON.stringify({ type: "payment.succeeded" }),
+      },
+    });
+
+    const stuck = await db.booking.findUniqueOrThrow({ where: { id: booking.id } });
+    expect(stuck.status).toBe("PENDING_PAYMENT");
+    expect(stuck.contactUnlockedAt).toBeNull();
+    expect(stuck.amountOre).toBe(150_000);
+    const stuckIntent = await db.paymentIntent.findUniqueOrThrow({ where: { id: intent.id } });
+    expect(stuckIntent.status).toBe("SUCCEEDED");
+    expect(stuckIntent.kind).toBe("RESERVATION");
+    expect(stuckIntent.amountOre).toBe(150_000);
+
+    const view = paymentConfirmView({
+      bookingStatus: stuck.status,
+      intentStatus: stuckIntent.status,
+      contactUnlocked: false,
+    });
+    expect(view.title).toMatch(/ikke ferdig/i);
+    expect(
+      demoIntentBadgeStatus({
+        intentStatus: stuckIntent.status,
+        bookingStatus: stuck.status,
+        contactUnlocked: false,
+      }),
+    ).toBe("PENDING");
+
+    const result = await confirmDemoPayment(db, {
+      eventId: `demo_confirm_stuck_${intent.id}`,
+      type: "payment.succeeded",
+      paymentIntentId: intent.id,
+      bookingId: booking.id,
+    });
+    expect(result.bookingStatus).toBe("PAID");
+    expect(result.contactUnlocked).toBe(true);
+
+    const after = await db.booking.findUniqueOrThrow({
+      where: { id: booking.id },
+      include: { extras: true, payments: true },
+    });
+    expect(after.status).toBe("PAID");
+    expect(after.contactUnlockedAt).not.toBeNull();
+    expect(after.payments.filter((payment) => payment.status === "SUCCEEDED")).toHaveLength(1);
+    expect(
+      describeBookingMoney({
+        agreedOre: after.amountOre,
+        extras: after.extras,
+        platformFeeBps: after.platformFeeBps,
+        status: after.status,
+        refundedOre: after.refundedOre,
+      }).remainingToPayOre,
+    ).toBe(0);
+    expect(await canViewerSeeContact(db, { viewerId: users.provider.id, jobId: job.id })).toBe(true);
+  });
+
+  it("idempotent replay av lykkes reservasjon finansierer fastlåst booking", async () => {
+    const { users, job, booking, intent } = await pendingBooking();
+    await db.paymentIntent.update({ where: { id: intent.id }, data: { status: "SUCCEEDED" } });
+    const eventId = `replay_stuck_${intent.id}`;
+    await db.payment.create({
+      data: {
+        bookingId: booking.id,
+        paymentIntentId: intent.id,
+        eventId,
+        amountOre: intent.amountOre,
+        status: "SUCCEEDED",
+        rawPayload: JSON.stringify({ type: "payment.succeeded" }),
+      },
+    });
+
+    const result = await handlePaymentWebhook(db, {
+      eventId,
+      type: "payment.succeeded",
+      paymentIntentId: intent.id,
+      bookingId: booking.id,
+    });
+    expect(result.bookingStatus).toBe("PAID");
+    expect(result.contactUnlocked).toBe(true);
+    expect(await canViewerSeeContact(db, { viewerId: users.provider.id, jobId: job.id })).toBe(true);
+  });
+
+  it("repairUnfinancedSucceededReservations treffer alle fastlåste reservasjonsrader", async () => {
+    const first = await pendingBooking();
+    const second = await pendingBooking();
+    for (const row of [first, second]) {
+      await db.paymentIntent.update({
+        where: { id: row.intent.id },
+        data: { status: "SUCCEEDED", kind: "RESERVATION" },
+      });
+    }
+
+    const repaired = await repairUnfinancedSucceededReservations(db);
+    expect(repaired.bookingIds).toEqual(expect.arrayContaining([first.booking.id, second.booking.id]));
+    expect(repaired.repairedCount).toBeGreaterThanOrEqual(2);
+
+    const again = await repairUnfinancedSucceededReservations(db);
+    expect(again.bookingIds).not.toContain(first.booking.id);
+    expect(again.bookingIds).not.toContain(second.booking.id);
+
+    for (const row of [first, second]) {
+      const after = await db.booking.findUniqueOrThrow({ where: { id: row.booking.id } });
+      expect(after.status).toBe("PAID");
+      expect(after.contactUnlockedAt).not.toBeNull();
+    }
+  });
+
+  it("applySucceededReservationFinance er idempotent på allerede betalt booking", async () => {
+    const { booking, intent } = await pendingBooking();
+    await confirmDemoPayment(db, {
+      eventId: `ok_${intent.id}`,
+      type: "payment.succeeded",
+      paymentIntentId: intent.id,
+      bookingId: booking.id,
+    });
+    const second = await applySucceededReservationFinance(db, booking.id, intent.id);
+    expect(second.bookingStatus).toBe("PAID");
     const charges = await db.settlementEntry.findMany({
       where: { bookingId: booking.id, type: LEDGER.CHARGE, extraChargeId: null },
     });
