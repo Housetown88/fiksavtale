@@ -46,8 +46,8 @@ export default async function AdminBookingsPage() {
         <section>
           <h2 className="font-serif text-2xl">Avvik: avsluttet med ubetalte tillegg</h2>
           <p className="mt-1 text-sm text-ink-soft">
-            Historiske rader der fullføring skjedde mens et godkjent tillegg sto ubetalt. Nye fullføringer
-            blokkeres.
+            Historiske rader der fullføring skjedde mens et godkjent tillegg sto ubetalt. Dette er ikke
+            det samme som avbestilling eller tvist med ubetalt tillegg. Nye fullføringer blokkeres.
           </p>
           <div className="mt-3 space-y-2">
             {inconsistent.map((booking) => (
@@ -100,7 +100,9 @@ function AdminBookingRow({
         <StatusBadge status={booking.status} showRaw />
       </div>
       <p className="mt-1 text-ink-soft">
-        {booking.customer.name} · {company} · finansiert {formatNok(money.fundedOre)}
+        {booking.customer.name} · {company} · avtalt {formatNok(money.agreedOre)} · finansiert{" "}
+        {formatNok(money.financedOre)}
+        {money.remainingToPayOre > 0 ? ` · rest ${formatNok(money.remainingToPayOre)}` : ""}
         {money.refund.status === "applied"
           ? ` · DEMO-refusjon ${formatNok(money.refund.amountOre)} (${money.refund.statusLabel})`
           : money.refund.status === "pending"
@@ -110,7 +112,9 @@ function AdminBookingRow({
               : ""}
         {money.inconsistentUnpaidApproved
           ? ` · avvik ubetalt tillegg ${formatNok(money.extrasApprovedUnpaidOre)}`
-          : ""}
+          : money.isClosed && money.unpaidApprovedCount > 0
+            ? ` · ubetalt tillegg ${formatNok(money.extrasApprovedUnpaidOre)} (historikk)`
+            : ""}
       </p>
     </Link>
   );

@@ -28,6 +28,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       extrasPaidOre: money.extrasPaidOre,
       extrasApprovedUnpaidOre: money.extrasApprovedUnpaidOre,
       fundedOre: money.fundedOre,
+      financedOre: money.financedOre,
       remainingToPayOre: money.remainingToPayOre,
       platformFeeOre: money.feeAfterRefundOre,
       providerPayoutOre: money.settlementAfterRefundOre,

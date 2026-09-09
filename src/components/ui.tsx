@@ -221,8 +221,14 @@ export function PriceBreakdown({
         ) : null}
         {view.extrasApprovedUnpaidOre > 0 ? (
           <div className="flex justify-between">
-            <dt>Godkjent, ikke betalt</dt>
+            <dt>{view.isClosed ? "Godkjent, ubetalt (historikk)" : "Godkjent, ikke betalt"}</dt>
             <dd>{formatNok(view.extrasApprovedUnpaidOre)}</dd>
+          </div>
+        ) : null}
+        {view.financedOre !== view.agreedOre + view.extrasPaidOre || view.status === "PENDING_PAYMENT" || view.isCancelled ? (
+          <div className="flex justify-between">
+            <dt>Faktisk finansiert</dt>
+            <dd>{formatNok(view.financedOre)}</dd>
           </div>
         ) : null}
         <div className="flex justify-between">
@@ -268,8 +274,12 @@ export function PriceBreakdown({
       {view.refundLabel ? <p className="mt-2 text-xs text-ink-soft">{view.refundLabel}</p> : null}
       {view.inconsistentUnpaidApproved ? (
         <p className="mt-2 text-xs font-semibold text-danger">
-          Avvik: bookingen er avsluttet, men har godkjente tillegg som ikke er betalt (
-          {formatNok(view.extrasApprovedUnpaidOre)}). Dette telles ikke som gjenstående betaling.
+          Avvik: jobben ble merket fullført mens godkjente tillegg sto ubetalt (
+          {formatNok(view.extrasApprovedUnpaidOre)}). Dette er historikk, ikke et betalingskrav.
+        </p>
+      ) : view.isClosed && view.unpaidApprovedCount > 0 ? (
+        <p className="mt-2 text-xs text-ink-soft">
+          Godkjente ubetalte tillegg vises som historikk. De kan ikke betales på en avsluttet booking.
         </p>
       ) : null}
       <p className="mt-2 text-xs text-ink-soft">

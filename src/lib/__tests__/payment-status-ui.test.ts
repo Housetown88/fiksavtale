@@ -123,4 +123,31 @@ describe("betalingsstatus-tekst", () => {
     expect(cancelled.title).toMatch(/avbrutt/i);
     expect(cancelled.showRetry).toBe(true);
   });
+
+  it("skjuler bekreftelse for tillegg på refundert og omtvistet booking", () => {
+    const refunded = paymentConfirmView({
+      bookingStatus: "REFUNDED",
+      intentStatus: "PENDING",
+      contactUnlocked: true,
+      extraCharge: true,
+      extraChargeStatus: "APPROVED",
+      intentKind: "EXTRA",
+    });
+    expect(refunded.showSimulate).toBe(false);
+    expect(refunded.showRetry).toBe(false);
+    expect(refunded.tone).toBe("warn");
+    expect(refunded.title).toMatch(/refundert/i);
+    expect(`${refunded.title} ${refunded.body} ${refunded.nextAction}`).not.toMatch(/Bekreft DEMO-betalingen under/);
+
+    const disputed = paymentConfirmView({
+      bookingStatus: "DISPUTED",
+      intentStatus: "PENDING",
+      contactUnlocked: true,
+      extraCharge: true,
+      extraChargeStatus: "APPROVED",
+      intentKind: "EXTRA",
+    });
+    expect(disputed.showSimulate).toBe(false);
+    expect(disputed.title).toMatch(/tvist/i);
+  });
 });

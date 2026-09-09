@@ -99,6 +99,18 @@ export async function registerAction(_prev: ActionState, formData: FormData): Pr
   redirect("/oversikt");
 }
 
+function bookingNoticePath(
+  bookingId: string,
+  message: string,
+  options?: { intent?: string; extraChargeId?: string; confirm?: boolean },
+) {
+  const params = new URLSearchParams({ varsel: message });
+  if (options?.intent) params.set("intent", options.intent);
+  if (options?.extraChargeId) params.set("extra", options.extraChargeId);
+  const path = options?.confirm ? `/booking/${bookingId}/bekreftelse` : `/booking/${bookingId}`;
+  return `${path}?${params.toString()}`;
+}
+
 async function viewer() {
   const user = await getCurrentUser();
   if (!user) throw new AuthzError("Du må være innlogget", 401);
@@ -261,15 +273,27 @@ export async function acceptOfferAction(formData: FormData) {
 }
 
 export async function startWorkAction(formData: FormData) {
-  const user = await viewer();
-  const booking = await markWorkStarted(db, user, String(formData.get("bookingId") ?? ""));
-  redirect(`/booking/${booking.id}`);
+  const bookingId = String(formData.get("bookingId") ?? "");
+  try {
+    const user = await viewer();
+    const booking = await markWorkStarted(db, user, bookingId);
+    redirect(`/booking/${booking.id}`);
+  } catch (error) {
+    if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
+    redirect(bookingNoticePath(bookingId, errorMessage(error)));
+  }
 }
 
 export async function completeBookingAction(formData: FormData) {
-  const user = await viewer();
-  const booking = await completeBooking(db, user, String(formData.get("bookingId") ?? ""));
-  redirect(`/booking/${booking.id}`);
+  const bookingId = String(formData.get("bookingId") ?? "");
+  try {
+    const user = await viewer();
+    const booking = await completeBooking(db, user, bookingId);
+    redirect(`/booking/${booking.id}`);
+  } catch (error) {
+    if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
+    redirect(bookingNoticePath(bookingId, errorMessage(error)));
+  }
 }
 
 export async function cancelBookingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -348,42 +372,60 @@ export async function decideExtraAction(formData: FormData) {
 }
 
 export async function startDemoPaymentAction(formData: FormData) {
-  const user = await viewer();
   const bookingId = String(formData.get("bookingId") ?? "");
   const extraChargeId = String(formData.get("extraChargeId") ?? "") || undefined;
-  const booking = await db.booking.findUnique({ where: { id: bookingId } });
-  if (!booking || (booking.customerId !== user.id && user.role !== "ADMIN")) {
-    throw new AuthzError("Bare kunden kan starte betaling", 403);
+  try {
+    const user = await viewer();
+    const booking = await db.booking.findUnique({ where: { id: bookingId } });
+    if (!booking || (booking.customerId !== user.id && user.role !== "ADMIN")) {
+      throw new AuthzError("Bare kunden kan starte betaling", 403);
+    }
+    const intent = await createPaymentIntent(db, bookingId, extraChargeId ? { extraChargeId } : undefined);
+    const extraQuery = extraChargeId ? `&extra=${extraChargeId}` : "";
+    redirect(`/booking/${bookingId}/bekreftelse?intent=${intent.id}${extraQuery}`);
+  } catch (error) {
+    if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
+    redirect(
+      bookingNoticePath(bookingId, errorMessage(error), extraChargeId ? { extraChargeId } : undefined),
+    );
   }
-  const intent = await createPaymentIntent(db, bookingId, extraChargeId ? { extraChargeId } : undefined);
-  const extraQuery = extraChargeId ? `&extra=${extraChargeId}` : "";
-  redirect(`/booking/${bookingId}/bekreftelse?intent=${intent.id}${extraQuery}`);
 }
 
 export async function simulateWebhookAction(formData: FormData) {
-  const user = await viewer();
   const bookingId = String(formData.get("bookingId") ?? "");
   const intentId = String(formData.get("intentId") ?? "");
-  const outcome = String(formData.get("outcome") ?? "succeeded");
-  const booking = await db.booking.findUnique({ where: { id: bookingId } });
-  if (!booking || (booking.customerId !== user.id && user.role !== "ADMIN")) {
-    throw new AuthzError("Ikke tillatt", 403);
-  }
-  const type =
-    outcome === "failed"
-      ? "payment.failed"
-      : outcome === "cancelled"
-        ? "payment.cancelled"
-        : "payment.succeeded";
   const extraChargeId = String(formData.get("extraChargeId") ?? "") || undefined;
-  await confirmDemoPayment(db, {
-    eventId: demoPaymentEventId(intentId, type),
-    type,
-    paymentIntentId: intentId,
-    bookingId,
-  });
-  const extraQuery = extraChargeId ? `&extra=${extraChargeId}` : "";
-  redirect(`/booking/${bookingId}/bekreftelse?intent=${intentId}${extraQuery}`);
+  try {
+    const user = await viewer();
+    const booking = await db.booking.findUnique({ where: { id: bookingId } });
+    if (!booking || (booking.customerId !== user.id && user.role !== "ADMIN")) {
+      throw new AuthzError("Ikke tillatt", 403);
+    }
+    const outcome = String(formData.get("outcome") ?? "succeeded");
+    const type =
+      outcome === "failed"
+        ? "payment.failed"
+        : outcome === "cancelled"
+          ? "payment.cancelled"
+          : "payment.succeeded";
+    await confirmDemoPayment(db, {
+      eventId: demoPaymentEventId(intentId, type),
+      type,
+      paymentIntentId: intentId,
+      bookingId,
+    });
+    const extraQuery = extraChargeId ? `&extra=${extraChargeId}` : "";
+    redirect(`/booking/${bookingId}/bekreftelse?intent=${intentId}${extraQuery}`);
+  } catch (error) {
+    if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
+    redirect(
+      bookingNoticePath(bookingId, errorMessage(error), {
+        intent: intentId,
+        extraChargeId,
+        confirm: true,
+      }),
+    );
+  }
 }
 
 export async function adminUpdateFeeAction(formData: FormData) {
