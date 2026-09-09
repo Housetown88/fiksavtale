@@ -74,6 +74,8 @@ Idempotens: samme `eventId` returnerer forrige resultat uten ny booking eller en
 
 Invariant: reservasjons-`PaymentIntent` med `SUCCEEDED` skal ha booking `PAID` og `contactUnlockedAt`. Innlogget DEMO-bekreftelse kaller `confirmDemoPayment` / `applySucceededReservationFinance`. Fastlåste rader (intensjon SUCCEEDED, booking PENDING_PAYMENT) repareres ved ny bekreftelse eller `repairUnfinancedSucceededReservations` — ikke ved å redigere enkeltrader for hånd. Return-URL alene låser ikke opp.
 
+Invariant (tillegg): EXTRA-`PaymentIntent` finansieres **ikke** ut fra bookingstatus. Bekreftelsessiden skiller hovedreservasjon og tillegg. Innlogget DEMO-bekreftelse av tillegg kaller `applySucceededExtraFinance` (`ExtraCharge` PAID + `EXTRA_CHARGE`/`EXTRA_COMMISSION`). Fastlåste PENDING EXTRA-rader repareres ved å trykke **Bekreft DEMO-betaling**. `SUCCEEDED` EXTRA uten PAID tillegg repareres ved samme knapp eller `repairUnpaidApprovedExtras`.
+
 Kontaktlås: `canViewerSeeContact` krever at viseren er part, `contactUnlockedAt` er satt, bookingstatus er betalt/påfølgende, **og** det finnes en `Payment` med `SUCCEEDED`. En suksess-URL er ikke nok.
 
 ## Sikkerhet
