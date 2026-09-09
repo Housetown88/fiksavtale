@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { assertCanViewOffers } from "@/lib/authz";
+import { assertCanViewOffers, serializeOffersForClient } from "@/lib/offer-access";
 import { errorMessage, errorStatus } from "@/lib/errors";
 
 export async function GET(request: Request) {
@@ -14,21 +14,11 @@ export async function GET(request: Request) {
     if (!jobId) {
       return NextResponse.json({ error: "jobId mangler" }, { status: 400 });
     }
-    const job = await assertCanViewOffers(db, user, jobId);
-    const offers = job.customerId === user.id || user.role === "ADMIN"
-      ? job.offers
-      : job.offers.filter((offer) => offer.providerId === user.id);
-    return NextResponse.json(
-      offers.map((offer) => ({
-        id: offer.id,
-        jobId: offer.jobId,
-        providerId: offer.providerId,
-        amountOre: offer.amountOre,
-        message: offer.message,
-        status: offer.status,
-        createdAt: offer.createdAt,
-      })),
-    );
+    const listed = await assertCanViewOffers(db, user, jobId);
+    return NextResponse.json({
+      offerCount: listed.offerCount,
+      offers: serializeOffersForClient(listed.offers),
+    });
   } catch (error) {
     return NextResponse.json({ error: errorMessage(error) }, { status: errorStatus(error) });
   }
