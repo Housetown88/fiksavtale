@@ -33,3 +33,17 @@ Dette er den eneste modellen som oppfyller «automatisk provisjon i betalingslø
 - Ekte refusjon i Vipps
 
 Ikke presenter dette som live.
+
+## Fastlåste DEMO-bookinger (intensjon SUCCEEDED, booking venter)
+
+Symptom: `PaymentIntent.kind = RESERVATION` og `status = SUCCEEDED`, men `Booking.status = PENDING_PAYMENT` og `contactUnlockedAt` er null. Bekreftelsessiden kan vise økt-status uten at bookingen er finansiert.
+
+Årsak (fikset i kode): DEMO-bekreftelse/webhook markerte intensjonen som lykkes uten å kjøre booking-sideeffektene (`PAID` + opplåst kontakt).
+
+Reparasjon etter deploy — **ikke** oppdater én produksjons-id for hånd:
+
+1. Kunden åpner bekreftelsessiden og trykker **Bekreft DEMO-betaling** på nytt. `confirmDemoPayment` ser den allerede lykkes reservasjonsintensjonen og kaller `applySucceededReservationFinance`.
+2. Alternativt, én gang i et vedlikeholdskall mot databasen: `repairUnfinancedSucceededReservations(db)` i `src/lib/payments.ts`. Funksjonen finner alle rader med lykkes reservasjon + `PENDING_PAYMENT`, setter `PAID` + `contactUnlockedAt`, og hopper over provisjon som allerede er bokført. Trygg å kjøre flere ganger.
+
+Return-URL / GET mot bekreftelsessiden finansierer ikke — det ville brutt kontaktlåsen.
+

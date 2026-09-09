@@ -6,7 +6,7 @@ import { getBookingForViewer } from "@/lib/authz";
 import { getContactPayload } from "@/lib/contact";
 import { simulateWebhookAction, startDemoPaymentAction } from "@/app/actions";
 import { Alert, PageTitle, StatusBadge } from "@/components/ui";
-import { paymentConfirmView } from "@/lib/payment-status-ui";
+import { demoIntentBadgeStatus, paymentConfirmView } from "@/lib/payment-status-ui";
 import { formatNok } from "@/lib/money";
 
 export default async function PaymentConfirmPage({
@@ -53,7 +53,16 @@ export default async function PaymentConfirmPage({
         </p>
         {paymentIntent ? (
           <p>
-            DEMO-bekreftelse: <StatusBadge status={paymentIntent.status} /> · {formatNok(paymentIntent.amountOre)}
+            DEMO-økt:{" "}
+            <StatusBadge
+              status={demoIntentBadgeStatus({
+                intentStatus: paymentIntent.status,
+                bookingStatus: booking.status,
+                contactUnlocked: contact.unlocked,
+                extraCharge: Boolean(extraCharge),
+              })}
+            />{" "}
+            · {formatNok(paymentIntent.amountOre)}
           </p>
         ) : (
           <p className="text-sm text-ink-soft">Ingen betalingsøkt er valgt.</p>

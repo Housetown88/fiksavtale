@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { paymentConfirmView } from "../payment-status-ui";
+import { demoIntentBadgeStatus, paymentConfirmView } from "../payment-status-ui";
 
 describe("betalingsstatus-tekst", () => {
   it("viser bekreftet når bookingen er betalt", () => {
@@ -32,5 +32,23 @@ describe("betalingsstatus-tekst", () => {
     expect(view.showSimulate).toBe(true);
     expect(view.nextAction).toBeTruthy();
     expect(`${view.title} ${view.body} ${view.nextAction}`).not.toMatch(/webhook/i);
+  });
+
+  it("viser ikke Bekreftet når intensjon er SUCCEEDED men bookingen venter", () => {
+    const view = paymentConfirmView({
+      bookingStatus: "PENDING_PAYMENT",
+      intentStatus: "SUCCEEDED",
+      contactUnlocked: false,
+    });
+    expect(view.title).toMatch(/ikke ferdig/i);
+    expect(view.tone).toBe("warn");
+    expect(view.showSimulate).toBe(true);
+    expect(
+      demoIntentBadgeStatus({
+        intentStatus: "SUCCEEDED",
+        bookingStatus: "PENDING_PAYMENT",
+        contactUnlocked: false,
+      }),
+    ).toBe("PENDING");
   });
 });

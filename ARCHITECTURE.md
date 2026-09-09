@@ -72,6 +72,8 @@ OPEN job
 
 Idempotens: samme `eventId` returnerer forrige resultat uten ny booking eller endret utbetaling. Allerede betalt booking får ikke ny utbetalingsberegning.
 
+Invariant: reservasjons-`PaymentIntent` med `SUCCEEDED` skal ha booking `PAID` og `contactUnlockedAt`. Innlogget DEMO-bekreftelse kaller `confirmDemoPayment` / `applySucceededReservationFinance`. Fastlåste rader (intensjon SUCCEEDED, booking PENDING_PAYMENT) repareres ved ny bekreftelse eller `repairUnfinancedSucceededReservations` — ikke ved å redigere enkeltrader for hånd. Return-URL alene låser ikke opp.
+
 Kontaktlås: `canViewerSeeContact` krever at viseren er part, `contactUnlockedAt` er satt, bookingstatus er betalt/påfølgende, **og** det finnes en `Payment` med `SUCCEEDED`. En suksess-URL er ikke nok.
 
 ## Sikkerhet

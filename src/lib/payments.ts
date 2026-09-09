@@ -112,9 +112,179 @@ export type WebhookResult = {
   ignored?: string;
 };
 
+export type PaymentWebhookOptions = {
+  /**
+   * Innlogget «Bekreft DEMO-betaling». Skal finansiere bookingen (PAID + kontakt)
+   * også i produksjon, der den eksterne DEMO-webhooken er sperret for ekte kunder.
+   */
+  applyFinance?: boolean;
+};
+
+function isReservationIntent(intent: { extraChargeId: string | null; kind: string }) {
+  return !intent.extraChargeId && intent.kind !== "EXTRA" && intent.kind !== "REFUND";
+}
+
+/**
+ * Invariant: en lykkes reservasjonsintensjon SKAL sette booking PAID + contactUnlockedAt.
+ * Brukes av DEMO-bekreftelse, webhook og reparasjon av fastlåste rader.
+ */
+async function financeSucceededReservationInTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    booking: {
+      id: string;
+      jobId: string;
+      amountOre: number;
+      platformFeeBps: number;
+      status: string;
+      contactUnlockedAt: Date | null;
+    };
+    intent: { id: string; amountOre: number; extraChargeId: string | null; kind: string };
+    paymentId?: string | null;
+  },
+) {
+  if (!isReservationIntent(input.intent)) {
+    throw new Error("Bare reservasjonsintensjon kan finansiere hovedbookingen");
+  }
+  if (input.booking.status !== "PENDING_PAYMENT") {
+    return;
+  }
+
+  const fee = calcCommission(input.intent.amountOre, input.booking.platformFeeBps);
+  const existingCharge = await tx.settlementEntry.findFirst({
+    where: { bookingId: input.booking.id, type: LEDGER.CHARGE, extraChargeId: null },
+  });
+  if (!existingCharge) {
+    await postLedger(tx, {
+      bookingId: input.booking.id,
+      type: LEDGER.CHARGE,
+      amountOre: input.intent.amountOre,
+      paymentId: input.paymentId,
+      eventId: `charge_reservation_${input.intent.id}`,
+    });
+    await postLedger(tx, {
+      bookingId: input.booking.id,
+      type: LEDGER.COMMISSION,
+      amountOre: fee.platformFeeOre,
+      paymentId: input.paymentId,
+      eventId: `fee_reservation_${input.intent.id}`,
+      note: "Provisjon trukket automatisk ved finansiering.",
+    });
+  }
+
+  await tx.booking.update({
+    where: { id: input.booking.id },
+    data: {
+      status: "PAID",
+      contactUnlockedAt: input.booking.contactUnlockedAt ?? new Date(),
+      approvalDeadlineAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      platformFeeOre: fee.platformFeeOre,
+      providerPayoutOre: fee.providerPayoutOre,
+    },
+  });
+  await tx.job.update({
+    where: { id: input.booking.jobId },
+    data: { status: "BOOKED" },
+  });
+}
+
+/** Finansier booking fra en allerede (eller nå) lykkes reservasjonsintensjon. */
+export async function applySucceededReservationFinance(
+  db: PrismaClient,
+  bookingId: string,
+  paymentIntentId: string,
+): Promise<WebhookResult> {
+  const booking = await db.booking.findUnique({ where: { id: bookingId } });
+  const intent = await db.paymentIntent.findUnique({ where: { id: paymentIntentId } });
+  if (!booking || !intent || intent.bookingId !== booking.id) {
+    throw new Error("Ugyldig booking eller betalingsintensjon");
+  }
+  if (!isReservationIntent(intent)) {
+    throw new Error("Bare reservasjonsintensjon kan finansiere hovedbookingen");
+  }
+
+  await db.$transaction(async (tx) => {
+    if (intent.status !== "SUCCEEDED") {
+      await tx.paymentIntent.update({
+        where: { id: intent.id },
+        data: { status: "SUCCEEDED" },
+      });
+    }
+    let payment = await tx.payment.findFirst({
+      where: { paymentIntentId: intent.id, status: "SUCCEEDED" },
+    });
+    if (!payment) {
+      payment = await tx.payment.create({
+        data: {
+          bookingId: booking.id,
+          paymentIntentId: intent.id,
+          eventId: `repair_reservation_${intent.id}`,
+          amountOre: intent.amountOre,
+          status: "SUCCEEDED",
+          rawPayload: JSON.stringify({ repaired: true, paymentIntentId: intent.id }),
+        },
+      });
+    }
+    await financeSucceededReservationInTx(tx, {
+      booking,
+      intent,
+      paymentId: payment.id,
+    });
+  });
+
+  const updated = await db.booking.findUniqueOrThrow({ where: { id: booking.id } });
+  return {
+    idempotentReplay: false,
+    bookingStatus: updated.status,
+    contactUnlocked: Boolean(updated.contactUnlockedAt),
+  };
+}
+
+/**
+ * Reparerer fastlåste DEMO-rader: reservasjonsintensjon SUCCEEDED, booking fortsatt PENDING_PAYMENT.
+ * Treffer alle slike rader — ikke én produksjons-id. Trygg å kjøre flere ganger (ingen dobbel provisjon).
+ */
+export async function repairUnfinancedSucceededReservations(db: PrismaClient) {
+  const intents = await db.paymentIntent.findMany({
+    where: {
+      status: "SUCCEEDED",
+      extraChargeId: null,
+      kind: "RESERVATION",
+    },
+  });
+  const repaired: string[] = [];
+  for (const intent of intents) {
+    const booking = await db.booking.findUnique({ where: { id: intent.bookingId } });
+    if (!booking || booking.status !== "PENDING_PAYMENT") continue;
+    await applySucceededReservationFinance(db, booking.id, intent.id);
+    repaired.push(booking.id);
+  }
+  return { repairedCount: repaired.length, bookingIds: repaired };
+}
+
+/** Kundens DEMO-bekreftelse — aldri bare merke intensjon uten booking-effekt. */
+export async function confirmDemoPayment(
+  db: PrismaClient,
+  event: WebhookEvent,
+): Promise<WebhookResult> {
+  if (event.type === "payment.succeeded") {
+    const intent = await db.paymentIntent.findUnique({ where: { id: event.paymentIntentId } });
+    if (
+      intent &&
+      intent.bookingId === event.bookingId &&
+      isReservationIntent(intent) &&
+      intent.status === "SUCCEEDED"
+    ) {
+      return applySucceededReservationFinance(db, event.bookingId, intent.id);
+    }
+  }
+  return handlePaymentWebhook(db, event, { applyFinance: true });
+}
+
 export async function handlePaymentWebhook(
   db: PrismaClient,
   event: WebhookEvent,
+  options?: PaymentWebhookOptions,
 ): Promise<WebhookResult> {
   const existing = await db.payment.findUnique({
     where: { eventId: event.eventId },
@@ -123,6 +293,18 @@ export async function handlePaymentWebhook(
     const booking = await db.booking.findUniqueOrThrow({
       where: { id: existing.bookingId },
     });
+    if (existing.status === "SUCCEEDED") {
+      const existingIntent = await db.paymentIntent.findUnique({
+        where: { id: existing.paymentIntentId },
+      });
+      if (
+        existingIntent &&
+        isReservationIntent(existingIntent) &&
+        booking.status === "PENDING_PAYMENT"
+      ) {
+        return applySucceededReservationFinance(db, booking.id, existingIntent.id);
+      }
+    }
     return {
       idempotentReplay: true,
       bookingStatus: booking.status,
@@ -214,7 +396,18 @@ export async function handlePaymentWebhook(
   const extraAlreadyPaid =
     intent.extraChargeId && booking.extras.some((extra) => extra.id === intent.extraChargeId && extra.status === "PAID");
 
-  const mayUnlock = canUnlockViaDemoPayment(booking.customer.email);
+  const mayUnlock = Boolean(options?.applyFinance) || canUnlockViaDemoPayment(booking.customer.email);
+
+  // Ingen falsk suksess: ekstern DEMO-webhook i prod skal ikke merke intensjon som
+  // SUCCEEDED uten å finansiere bookingen. Innlogget bekreftelse bruker applyFinance.
+  if (paymentStatus === "SUCCEEDED" && !intent.extraChargeId && !mayUnlock) {
+    return {
+      idempotentReplay: false,
+      bookingStatus: booking.status,
+      contactUnlocked: Boolean(booking.contactUnlockedAt),
+      ignored: "prod_demo_blocked",
+    };
+  }
 
   await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const payment = await tx.payment.create({
@@ -292,47 +485,10 @@ export async function handlePaymentWebhook(
       return;
     }
 
-    const fee = calcCommission(intent.amountOre, booking.platformFeeBps);
-    await postLedger(tx, {
-      bookingId: booking.id,
-      type: LEDGER.CHARGE,
-      amountOre: intent.amountOre,
+    await financeSucceededReservationInTx(tx, {
+      booking,
+      intent,
       paymentId: payment.id,
-      eventId: `charge_${event.eventId}`,
-    });
-    await postLedger(tx, {
-      bookingId: booking.id,
-      type: LEDGER.COMMISSION,
-      amountOre: fee.platformFeeOre,
-      paymentId: payment.id,
-      eventId: `fee_${event.eventId}`,
-      note: "Provisjon trukket automatisk ved finansiering.",
-    });
-
-    if (!mayUnlock) {
-      await tx.booking.update({
-        where: { id: booking.id },
-        data: {
-          platformFeeOre: fee.platformFeeOre,
-          providerPayoutOre: fee.providerPayoutOre,
-        },
-      });
-      return;
-    }
-
-    await tx.booking.update({
-      where: { id: booking.id },
-      data: {
-        status: "PAID",
-        contactUnlockedAt: new Date(),
-        approvalDeadlineAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        platformFeeOre: fee.platformFeeOre,
-        providerPayoutOre: fee.providerPayoutOre,
-      },
-    });
-    await tx.job.update({
-      where: { id: booking.jobId },
-      data: { status: "BOOKED" },
     });
   });
 

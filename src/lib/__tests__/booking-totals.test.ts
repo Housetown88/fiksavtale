@@ -20,6 +20,8 @@ describe("prisoversikt", () => {
     expect(money.originalJobLabel).toBe("Opprinnelig jobbpris");
     expect(money.customerPayLabel).toBe("Totalt inkl. betalte tillegg");
     expect(money.customerPayLabel).not.toBe("Du betaler");
+    expect(money.providerJobLabel).toBe("Avtalt jobbpris");
+    expect(money.providerJobLabel).not.toBe("Du betaler");
     expect(money.expectedSettlementOre).toBe(153_000);
   });
 
