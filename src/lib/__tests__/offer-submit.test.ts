@@ -3,6 +3,7 @@ import { AuthzError } from "../authz";
 import { LeakFilterError } from "../leak-filter";
 import { statusLabelNb } from "../status-labels";
 import {
+  canShowOfferAlreadyExists,
   canShowOfferSuccess,
   OFFER_SEND_FAILED,
   OFFER_STATUS_LABELS,
@@ -23,6 +24,12 @@ describe("bekreftelse etter sendt tilbud", () => {
     ).toBe(false);
     expect(canShowOfferSuccess({ sentOfferId: "true", confirmedOfferId: undefined })).toBe(false);
     expect(canShowOfferSuccess({ sentOfferId: undefined, confirmedOfferId: "offer_1" })).toBe(false);
+    expect(
+      canShowOfferAlreadyExists({ existingOfferId: "offer_1", confirmedOfferId: "offer_1" }),
+    ).toBe(true);
+    expect(
+      canShowOfferAlreadyExists({ existingOfferId: "offer_1", confirmedOfferId: "offer_other" }),
+    ).toBe(false);
   });
 
   it("gir aldri ok-flagg ved feil og bevarer pris og melding", () => {

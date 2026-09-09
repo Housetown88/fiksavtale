@@ -37,6 +37,11 @@ export default async function AdminPaymentsPage() {
               <p>
                 Hendelse {formatNok(payment.amountOre)} · samlet finansiert {formatNok(money.fundedOre)} ·
                 gebyr {formatNok(money.feeAfterRefundOre)}
+                {money.refund.status === "applied"
+                  ? ` · DEMO-refusjon ${formatNok(money.refund.amountOre)} (${money.refund.statusLabel})`
+                  : money.refund.status === "pending"
+                    ? ` · DEMO-refusjon ${money.refund.statusLabel}`
+                    : ""}
               </p>
             </div>
           );

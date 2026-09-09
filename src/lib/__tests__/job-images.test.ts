@@ -5,13 +5,8 @@ import { createTestUsers, setupTestDb } from "./helpers";
 import { acceptOffer, createJob, createOffer } from "../domain";
 import { AuthzError, getJobForViewer } from "../authz";
 import { canViewerSeeContact } from "../contact";
-import {
-  JobImageError,
-  MAX_JOB_IMAGE_BYTES,
-  MAX_JOB_IMAGES,
-  processJobImage,
-  saveJobImages,
-} from "../job-images";
+import { JobImageError, MAX_JOB_IMAGE_BYTES, MAX_JOB_IMAGES, processJobImage, saveJobImages } from "../job-images";
+import { JOB_IMAGE_TYPE_ERROR, jobImageSelectionError } from "../job-image-limits";
 
 let db: PrismaClient;
 
@@ -49,6 +44,26 @@ describe("oppdragsbilder", () => {
 
   it("avviser filer som ikke er jpeg/png/webp", async () => {
     await expect(processJobImage(Buffer.from("ikke-et-bilde"))).rejects.toBeInstanceOf(JobImageError);
+    await expect(processJobImage(Buffer.from("ikke-et-bilde"))).rejects.toThrow(JOB_IMAGE_TYPE_ERROR);
+    expect(
+      jobImageSelectionError([{ name: "avtale.pdf", type: "application/pdf", size: 1200 }]),
+    ).toBe(JOB_IMAGE_TYPE_ERROR);
+    expect(jobImageSelectionError([{ name: "bilde.png", type: "image/png", size: 1200 }])).toBeNull();
+  });
+
+  it("avviser PDF også når MIME er oppgitt på lagring", async () => {
+    const users = await createTestUsers(db);
+    const job = await createJob(db, { id: users.customer.id, role: "CUSTOMER" }, {
+      title: "Ugyldig filtype",
+      description: "Skal avvise PDF.",
+      category: "elektriker",
+      area: "Tøyen",
+    });
+    const pdf = new File([new Uint8Array([0x25, 0x50, 0x44, 0x46])], "avtale.pdf", {
+      type: "application/pdf",
+    });
+    await expect(saveJobImages(db, job.id, [pdf])).rejects.toThrow(JOB_IMAGE_TYPE_ERROR);
+    expect(await db.jobImage.count({ where: { jobId: job.id } })).toBe(0);
   });
 
   it("lagrer inntil maks antall bilder på et oppdrag", async () => {

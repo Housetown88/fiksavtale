@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MAX_JOB_IMAGES } from "@/lib/job-image-limits";
+import { JOB_IMAGE_TYPE_ERROR, MAX_JOB_IMAGES, jobImageSelectionError } from "@/lib/job-image-limits";
 
 export function JobImagePicker() {
   const [previews, setPreviews] = useState<string[]>([]);
@@ -21,12 +21,13 @@ export function JobImagePicker() {
           className="sr-only"
           type="file"
           name="images"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
           multiple
           onChange={(event) => {
             const files = Array.from(event.target.files ?? []);
-            if (files.length > MAX_JOB_IMAGES) {
-              setError(`Maks ${MAX_JOB_IMAGES} bilder.`);
+            const selectionError = jobImageSelectionError(files);
+            if (selectionError) {
+              setError(selectionError);
               event.target.value = "";
               setPreviews([]);
               return;
@@ -37,7 +38,13 @@ export function JobImagePicker() {
         />
       </label>
       <p className="text-xs text-ink-soft">{helper}</p>
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? (
+        <p className="text-sm text-danger" role="alert">
+          {error === JOB_IMAGE_TYPE_ERROR
+            ? `${error} PDF, Word og andre filtyper avvises.`
+            : error}
+        </p>
+      ) : null}
       {previews.length > 0 ? (
         <ul className="mt-1 grid grid-cols-3 gap-2">
           {previews.map((src) => (

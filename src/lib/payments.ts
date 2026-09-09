@@ -79,6 +79,17 @@ export async function createPaymentIntent(
     if (!["PAID", "IN_PROGRESS"].includes(booking.status)) {
       throw new Error("Tillegg kan betales først etter at hovedjobben er bekreftet.");
     }
+    const existingExtra = await db.paymentIntent.findFirst({
+      where: {
+        bookingId: booking.id,
+        extraChargeId: extra.id,
+        status: "PENDING",
+        kind: "EXTRA",
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (existingExtra) return existingExtra;
     return db.paymentIntent.create({
       data: {
         bookingId: booking.id,
@@ -94,6 +105,17 @@ export async function createPaymentIntent(
   if (booking.status !== "PENDING_PAYMENT") {
     throw new Error("Bookingen kan ikke betales i denne tilstanden");
   }
+  const existingReservation = await db.paymentIntent.findFirst({
+    where: {
+      bookingId: booking.id,
+      extraChargeId: null,
+      status: "PENDING",
+      kind: "RESERVATION",
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  if (existingReservation) return existingReservation;
   return db.paymentIntent.create({
     data: {
       bookingId: booking.id,
@@ -401,6 +423,10 @@ export async function repairUnpaidApprovedExtras(db: PrismaClient) {
     repaired.push(extra.id);
   }
   return { repairedCount: repaired.length, extraChargeIds: repaired };
+}
+
+export function demoPaymentEventId(intentId: string, type: WebhookEvent["type"]): string {
+  return `demo_${intentId}_${type}`;
 }
 
 /** Kundens DEMO-bekreftelse — aldri bare merke intensjon uten booking- eller tilleggseffekt. */

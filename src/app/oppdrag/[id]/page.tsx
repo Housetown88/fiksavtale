@@ -14,7 +14,7 @@ import { JobImageGallery } from "@/components/JobImages";
 import { formatBudgetRange } from "@/lib/budget";
 import { formatNok } from "@/lib/money";
 import { formatOsloDateTime } from "@/lib/format";
-import { canShowOfferSuccess } from "@/lib/offer-submit";
+import { canShowOfferAlreadyExists, canShowOfferSuccess } from "@/lib/offer-submit";
 import {
   listOffersForViewer,
   offerCountFirmsLabel,
@@ -28,10 +28,10 @@ export default async function JobDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ sendt?: string }>;
+  searchParams: Promise<{ sendt?: string; finnes?: string }>;
 }) {
   const { id } = await params;
-  const { sendt } = await searchParams;
+  const { sendt, finnes } = await searchParams;
   const user = await getCurrentUser();
   let job;
   try {
@@ -71,9 +71,19 @@ export default async function JobDetailPage({
           (offer) => offer.providerId === user.id && offer.id === sendt && offer.status === "PENDING",
         )
       : undefined;
+  const confirmedExistingOffer =
+    user?.role === "PROVIDER" && finnes
+      ? offers.find(
+          (offer) => offer.providerId === user.id && offer.id === finnes && offer.status === "PENDING",
+        )
+      : undefined;
   const showOfferSuccess = canShowOfferSuccess({
     sentOfferId: sendt,
     confirmedOfferId: confirmedSentOffer?.id,
+  });
+  const showOfferAlreadyExists = canShowOfferAlreadyExists({
+    existingOfferId: finnes,
+    confirmedOfferId: confirmedExistingOffer?.id,
   });
   const jobHref = `/oppdrag/${job.id}`;
 
@@ -228,6 +238,11 @@ export default async function JobDetailPage({
             sentAtLabel={formatOsloDateTime(confirmedSentOffer.createdAt)}
             jobHref={jobHref}
           />
+        ) : null}
+        {showOfferAlreadyExists ? (
+          <Alert tone="info">
+            Du har allerede et aktivt tilbud på dette oppdraget. Et nytt ble ikke opprettet.
+          </Alert>
         ) : null}
         {ownPendingOffer ? (
           <ProviderSentOffer

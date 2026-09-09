@@ -37,7 +37,59 @@ describe("prisoversikt", () => {
     expect(money.customerPayLabel).toBe("Historisk avtalesum");
     expect(money.customerPayLabel).not.toBe("Du betaler");
     expect(money.remainingToPayOre).toBe(0);
+    expect(money.refund.status).toBe("not_applicable");
+    expect(money.refund.statusLabel).toBe("Ikke aktuelt");
     expect(money.refundLabel).toMatch(/Ingenting gjenstår/);
+  });
+
+  it("viser venter DEMO-refusjon og null gjenstående når bookingen er i tvist", () => {
+    const money = describeBookingMoney({
+      agreedOre: 150_000,
+      extras: [{ amountOre: 20_000, status: "PAID" }],
+      platformFeeBps: 1000,
+      status: "DISPUTED",
+      refundedOre: 0,
+    });
+    expect(money.isDisputed).toBe(true);
+    expect(money.isClosed).toBe(true);
+    expect(money.remainingToPayOre).toBe(0);
+    expect(money.refund.status).toBe("pending");
+    expect(money.refund.statusLabel).toBe("Venter");
+    expect(money.refund.heldOre).toBe(170_000);
+    expect(money.refund.amountOre).toBe(0);
+    expect(money.refund.headline).toMatch(/venter/i);
+    expect(money.refund.detail).toMatch(/oppgjørsboken/i);
+    expect(money.refund.detail).toMatch(/ingen ekte Vipps/i);
+    expect(money.customerPayLabel).toMatch(/holdes i tvist/i);
+  });
+
+  it("viser registrert DEMO-refusjon etter avbestilling før start", () => {
+    const money = describeBookingMoney({
+      agreedOre: 150_000,
+      extras: [],
+      platformFeeBps: 1000,
+      status: "REFUNDED",
+      refundedOre: 150_000,
+    });
+    expect(money.refund.status).toBe("applied");
+    expect(money.refund.statusLabel).toBe("Registrert");
+    expect(money.refund.amountOre).toBe(150_000);
+    expect(money.remainingToPayOre).toBe(0);
+    expect(money.refund.detail).toMatch(/ikke et ekte Vipps/i);
+  });
+
+  it("flagger historisk fullført med ubetalte godkjente tillegg uten å kreve betaling", () => {
+    const money = describeBookingMoney({
+      agreedOre: 150_000,
+      extras: [{ amountOre: 20_000, status: "APPROVED" }],
+      platformFeeBps: 1000,
+      status: "COMPLETED",
+    });
+    expect(money.remainingToPayOre).toBe(0);
+    expect(money.inconsistentUnpaidApproved).toBe(true);
+    expect(money.unpaidApprovedCount).toBe(1);
+    expect(money.extrasApprovedUnpaidOre).toBe(20_000);
+    expect(money.isClosed).toBe(true);
   });
 
   it("justerer gebyr etter delvis refusjon uten dobbelttelling", () => {

@@ -149,10 +149,15 @@ export default async function OverviewPage() {
                       : ""}
                     {money.remainingToPayOre > 0
                       ? ` · gjenstår ${formatNok(money.remainingToPayOre)}`
-                      : money.isHistorical
+                      : money.isHistorical || money.isDisputed
                         ? " · ingenting gjenstår"
                         : ""}{" "}
                     · gebyr {formatNok(money.feeAfterRefundOre)}
+                    {money.refund.status === "applied"
+                      ? ` · DEMO-refusjon ${formatNok(money.refund.amountOre)}`
+                      : money.refund.status === "pending"
+                        ? " · DEMO-refusjon venter"
+                        : ""}
                   </p>
                 </div>
                 <StatusBadge status={booking.status} />

@@ -1,4 +1,4 @@
-import type { Offer, PrismaClient } from "@prisma/client";
+import { Prisma, type Offer, type PrismaClient } from "@prisma/client";
 import { assertNoContactLeak } from "./leak-filter";
 import { calcCommission } from "./money";
 import { isValidOrgNumber, normalizeOrgNumber } from "./orgnr";
@@ -12,7 +12,7 @@ import { sendPasswordResetEmail } from "./email";
 import { hitRateLimit } from "./rate-limit";
 import { LEDGER, postLedger } from "./ledger";
 import { refundBooking } from "./payments";
-import { summarizeBookingMoney } from "./booking-totals";
+import { summarizeBookingMoney, unpaidApprovedExtras } from "./booking-totals";
 import { ensureProviderAlertPreference, assertValidJobTaxonomy } from "./job-alerts";
 
 export async function hashPassword(password: string): Promise<string> {
@@ -347,6 +347,16 @@ export async function createOfferResult(
       return { offer: pending, created: false };
     }
 
+    const conversation = await tx.conversation.findUnique({
+      where: { jobId_providerId: { jobId: job.id, providerId: viewer.id } },
+    });
+    if (conversation?.offerId) {
+      const linked = await tx.offer.findUnique({ where: { id: conversation.offerId } });
+      if (linked?.status === "PENDING") {
+        return { offer: linked, created: false };
+      }
+    }
+
     const offer = await tx.offer.create({
       data: {
         jobId: job.id,
@@ -356,16 +366,39 @@ export async function createOfferResult(
       },
     });
 
-    await tx.conversation.upsert({
-      where: { jobId_providerId: { jobId: job.id, providerId: viewer.id } },
-      update: { offerId: offer.id },
-      create: {
-        jobId: job.id,
-        providerId: viewer.id,
-        customerId: job.customerId,
-        offerId: offer.id,
-      },
-    });
+    if (conversation) {
+      await tx.conversation.update({
+        where: { id: conversation.id },
+        data: { offerId: offer.id },
+      });
+      return { offer, created: true };
+    }
+
+    try {
+      await tx.conversation.create({
+        data: {
+          jobId: job.id,
+          providerId: viewer.id,
+          customerId: job.customerId,
+          offerId: offer.id,
+        },
+      });
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+        throw error;
+      }
+      const winner = await tx.offer.findFirst({
+        where: {
+          jobId: job.id,
+          providerId: viewer.id,
+          status: "PENDING",
+          id: { not: offer.id },
+        },
+      });
+      if (!winner) throw error;
+      await tx.offer.delete({ where: { id: offer.id } });
+      return { offer: winner, created: false };
+    }
 
     return { offer, created: true };
   });
@@ -470,6 +503,15 @@ export async function markWorkStarted(db: PrismaClient, viewer: Viewer, bookingI
   });
 }
 
+function assertCanCompleteBooking(booking: { status: string; extras: { status: string }[] }) {
+  if (booking.status !== "IN_PROGRESS" && booking.status !== "PAID") {
+    throw new Error("Bookingen kan ikke fullføres i denne tilstanden.");
+  }
+  if (unpaidApprovedExtras(booking.extras).length > 0) {
+    throw new Error("Godkjente tillegg må betales før jobben kan fullføres.");
+  }
+}
+
 export async function completeBooking(db: PrismaClient, viewer: Viewer, bookingId: string) {
   const booking = await db.booking.findUnique({
     where: { id: bookingId },
@@ -479,21 +521,29 @@ export async function completeBooking(db: PrismaClient, viewer: Viewer, bookingI
   if (booking.customerId !== viewer.id && viewer.role !== "ADMIN") {
     throw new AuthzError("Bare kunden kan godkjenne ferdig arbeid", 403);
   }
-  if (booking.status !== "IN_PROGRESS" && booking.status !== "PAID") {
-    throw new Error("Bookingen kan ikke fullføres i denne tilstanden.");
-  }
-  const unpaidApproved = booking.extras.filter((extra) => extra.status === "APPROVED");
-  if (unpaidApproved.length > 0) {
-    throw new Error("Godkjente tillegg må betales før jobben kan fullføres.");
-  }
+  assertCanCompleteBooking(booking);
   return db.$transaction(async (tx) => {
+    const fresh = await tx.booking.findUnique({
+      where: { id: booking.id },
+      include: { extras: true },
+    });
+    if (!fresh) throw new AuthzError("Bookingen finnes ikke", 404);
+    assertCanCompleteBooking(fresh);
+
     await tx.extraCharge.updateMany({
       where: { bookingId: booking.id, status: "PROPOSED" },
       data: { status: "REJECTED" },
     });
+    const updated = await tx.booking.updateMany({
+      where: { id: booking.id, status: { in: ["PAID", "IN_PROGRESS"] } },
+      data: { status: "COMPLETED", completedAt: new Date(), payoutReleasedAt: new Date() },
+    });
+    if (updated.count !== 1) {
+      throw new Error("Bookingen kan ikke fullføres i denne tilstanden.");
+    }
     await tx.job.update({ where: { id: booking.jobId }, data: { status: "COMPLETED" } });
-    const money = summarizeBookingMoney(booking.amountOre, booking.extras, booking.platformFeeBps, {
-      refundedOre: booking.refundedOre,
+    const money = summarizeBookingMoney(fresh.amountOre, fresh.extras, fresh.platformFeeBps, {
+      refundedOre: fresh.refundedOre,
     });
     await postLedger(tx, {
       bookingId: booking.id,
@@ -502,10 +552,7 @@ export async function completeBooking(db: PrismaClient, viewer: Viewer, bookingI
       eventId: `payout_${booking.id}`,
       note: "Oppgjør til firma etter kundegodkjenning. DEMO: ingen ekte utbetaling.",
     });
-    return tx.booking.update({
-      where: { id: booking.id },
-      data: { status: "COMPLETED", completedAt: new Date(), payoutReleasedAt: new Date() },
-    });
+    return tx.booking.findUniqueOrThrow({ where: { id: booking.id } });
   });
 }
 
@@ -700,8 +747,7 @@ export async function applyApprovalTimeout(db: PrismaClient, bookingId: string, 
   if (!["PAID", "IN_PROGRESS"].includes(booking.status)) {
     throw new Error("Bookingen kan ikke auto-godkjennes i denne tilstanden.");
   }
-  const unpaidApproved = booking.extras.filter((extra) => extra.status === "APPROVED");
-  if (unpaidApproved.length > 0) {
+  if (unpaidApprovedExtras(booking.extras).length > 0) {
     throw new Error("Godkjente tillegg må betales før auto-godkjenning.");
   }
   return completeBooking(db, { id: booking.customerId, role: "CUSTOMER" }, booking.id);

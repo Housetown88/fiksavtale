@@ -240,20 +240,38 @@ export function PriceBreakdown({
             <dd>{formatNok(view.settlementAfterRefundOre)}</dd>
           </div>
         )}
-        {!view.isHistorical ? (
+        {!view.isHistorical && !view.isDisputed && !view.isClosed ? (
           <div className="flex justify-between">
             <dt>Gjenstår å betale</dt>
             <dd>{formatNok(view.remainingToPayOre)}</dd>
           </div>
         ) : null}
-        {view.refundedOre > 0 ? (
+        {view.refund.status === "applied" || view.refundedOre > 0 ? (
           <div className="flex justify-between">
-            <dt>Refundert</dt>
+            <dt>DEMO-refusjon (registrert)</dt>
             <dd>{formatNok(view.refundedOre)}</dd>
+          </div>
+        ) : null}
+        {view.isDisputed && view.refund.heldOre > 0 ? (
+          <div className="flex justify-between">
+            <dt>Holdes i tvist (DEMO)</dt>
+            <dd>{formatNok(view.refund.heldOre)}</dd>
+          </div>
+        ) : null}
+        {view.refund.status !== "not_applicable" || view.isCancelled || view.isDisputed ? (
+          <div className="flex justify-between">
+            <dt>DEMO-refusjon status</dt>
+            <dd>{view.refund.statusLabel}</dd>
           </div>
         ) : null}
       </dl>
       {view.refundLabel ? <p className="mt-2 text-xs text-ink-soft">{view.refundLabel}</p> : null}
+      {view.inconsistentUnpaidApproved ? (
+        <p className="mt-2 text-xs font-semibold text-danger">
+          Avvik: bookingen er avsluttet, men har godkjente tillegg som ikke er betalt (
+          {formatNok(view.extrasApprovedUnpaidOre)}). Dette telles ikke som gjenstående betaling.
+        </p>
+      ) : null}
       <p className="mt-2 text-xs text-ink-soft">
         Provisjon registreres automatisk ved finansiering. DEMO: ingen ekte Vipps-trekk.
       </p>
