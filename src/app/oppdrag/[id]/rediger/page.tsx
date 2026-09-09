@@ -32,6 +32,7 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
             title: job.title,
             description: job.description,
             category: job.category,
+            subcategory: job.subcategory ?? "",
             area: job.area,
             addressLine: job.addressLine ?? "",
             postalCode: job.postalCode ?? "",

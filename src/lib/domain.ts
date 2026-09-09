@@ -13,6 +13,7 @@ import { hitRateLimit } from "./rate-limit";
 import { LEDGER, postLedger } from "./ledger";
 import { refundBooking } from "./payments";
 import { summarizeBookingMoney } from "./booking-totals";
+import { ensureProviderAlertPreference, assertValidJobTaxonomy } from "./job-alerts";
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
@@ -38,6 +39,10 @@ export async function registerUser(
     orgNumber?: string;
     about?: string;
     serviceAreas?: string;
+    alertCategories?: string[];
+    alertAreas?: string[];
+    alertRadiusKm?: number | null;
+    alertEmailEnabled?: boolean;
   },
 ) {
   const email = input.email.trim().toLowerCase();
@@ -92,6 +97,15 @@ export async function registerUser(
           : undefined,
     },
   });
+  if (input.role === "PROVIDER") {
+    await ensureProviderAlertPreference(db, user.id, {
+      categories: input.alertCategories ?? [],
+      areas: input.alertAreas ?? [],
+      radiusKm: input.alertRadiusKm ?? null,
+      emailEnabled: Boolean(input.alertEmailEnabled),
+      paused: false,
+    });
+  }
   if (
     input.role === "PROVIDER" &&
     input.orgNumber &&
@@ -116,6 +130,7 @@ function jobFields(input: {
   title: string;
   description: string;
   category: string;
+  subcategory?: string | null;
   area: string;
   postalCode?: string;
   addressLine?: string;
@@ -127,6 +142,8 @@ function jobFields(input: {
   if (!input.title.trim() || !input.description.trim()) {
     throw new Error("Tittel og beskrivelse må fylles ut.");
   }
+  const subcategory = input.subcategory?.trim() || null;
+  assertValidJobTaxonomy(input.category, subcategory);
   if (input.budgetMinOre != null && input.budgetMinOre < 0) {
     throw new Error("Budsjett fra kan ikke være negativt.");
   }
@@ -144,6 +161,7 @@ function jobFields(input: {
     title: input.title.trim(),
     description: input.description.trim(),
     category: input.category,
+    subcategory,
     area: input.area.trim(),
     postalCode: input.postalCode?.trim() || null,
     addressLine: input.addressLine?.trim() || null,
@@ -159,6 +177,7 @@ export async function createJob(
     title: string;
     description: string;
     category: string;
+    subcategory?: string | null;
     area: string;
     postalCode?: string;
     addressLine?: string;
@@ -185,6 +204,7 @@ export async function updateJob(
     title: string;
     description: string;
     category: string;
+    subcategory?: string | null;
     area: string;
     postalCode?: string;
     addressLine?: string;

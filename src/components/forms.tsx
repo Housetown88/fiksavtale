@@ -20,10 +20,11 @@ import {
   updateProfileAction,
   type ActionState,
 } from "@/app/actions";
-import { JOB_CATEGORIES, OSLO_AREAS } from "@/lib/categories";
+import { childrenOf, JOB_CATEGORIES, OSLO_AREAS } from "@/lib/categories";
 import { calcCommission, nokToOre } from "@/lib/money";
 import { JobImagePicker } from "./JobImages";
 import { Alert, FeeBox } from "./ui";
+import { JobAlertPreferenceFields, type JobAlertFieldValues } from "./JobAlertPreferenceFields";
 
 function ErrorBox({ state }: { state: ActionState }) {
   if (!state?.error) return null;
@@ -136,77 +137,141 @@ export function ResetPasswordForm({ token }: { token: string }) {
 export function RegisterForm() {
   const [state, action, pending] = useActionState(registerAction, {});
   const [role, setRole] = useState("CUSTOMER");
+  const [firmStep, setFirmStep] = useState(0);
+  const [alerts, setAlerts] = useState<JobAlertFieldValues>({
+    categories: [],
+    areas: [],
+    radiusKm: null,
+    emailEnabled: false,
+    paused: false,
+  });
   const isFirm = role === "PROVIDER";
+  const showAccount = !isFirm || firmStep === 0;
+  const maxFirmStep = 3;
+
   return (
     <form action={action} className="grid gap-3">
       <ErrorBox state={state} />
-      <Field id="register-role" label="Jeg er">
-        <select
-          className="field"
-          id="register-role"
-          name="role"
-          value={role}
-          onChange={(event) => setRole(event.target.value)}
-        >
-          <option value="CUSTOMER">Privatkunde</option>
-          <option value="PROVIDER">Bedrift (krever org.nr)</option>
-        </select>
-      </Field>
-      <Field id="register-name" label="Navn">
-        <input className="field" id="register-name" name="name" required />
-      </Field>
-      <Field id="register-email" label="E-post">
-        <input className="field" id="register-email" name="email" type="email" required />
-      </Field>
-      <Field id="register-password" label="Passord (minst 8 tegn)">
-        <input className="field" id="register-password" name="password" type="password" minLength={8} required />
-      </Field>
-      <Field id="register-phone" label="Telefon (lagres, vises først etter betaling)">
-        <input className="field" id="register-phone" name="phone" />
-      </Field>
-      {!isFirm ? (
-        <>
-          <Field id="register-area" label="Område">
-            <select className="field" id="register-area" name="area" defaultValue="Grünerløkka">
-              {OSLO_AREAS.map((area) => (
-                <option key={area}>{area}</option>
-              ))}
-            </select>
-          </Field>
-          <Field id="register-address" label="Gateadresse (ikke synlig før betalt booking)">
-            <input className="field" id="register-address" name="addressLine" />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field id="register-postal" label="Postnr">
-              <input className="field" id="register-postal" name="postalCode" />
+      {isFirm ? (
+        <p className="text-sm text-ink-soft">
+          Steg {firmStep + 1} av {maxFirmStep + 1}
+        </p>
+      ) : null}
+      <div className={showAccount ? "grid gap-3" : "hidden"}>
+        <Field id="register-role" label="Jeg er">
+          <select
+            className="field"
+            id="register-role"
+            name="role"
+            value={role}
+            onChange={(event) => {
+              setRole(event.target.value);
+              setFirmStep(0);
+            }}
+          >
+            <option value="CUSTOMER">Privatkunde</option>
+            <option value="PROVIDER">Bedrift (krever org.nr)</option>
+          </select>
+        </Field>
+        <Field id="register-name" label="Navn">
+          <input className="field" id="register-name" name="name" required />
+        </Field>
+        <Field id="register-email" label="E-post">
+          <input className="field" id="register-email" name="email" type="email" required />
+        </Field>
+        <Field id="register-password" label="Passord (minst 8 tegn)">
+          <input className="field" id="register-password" name="password" type="password" minLength={8} required />
+        </Field>
+        <Field id="register-phone" label="Telefon (lagres, vises først etter betaling)">
+          <input className="field" id="register-phone" name="phone" />
+        </Field>
+        {!isFirm ? (
+          <>
+            <Field id="register-area" label="Område">
+              <select className="field" id="register-area" name="area" defaultValue="Grünerløkka">
+                {OSLO_AREAS.map((area) => (
+                  <option key={area}>{area}</option>
+                ))}
+              </select>
             </Field>
-            <Field id="register-city" label="Sted">
-              <input className="field" id="register-city" name="city" defaultValue="Oslo" />
+            <Field id="register-address" label="Gateadresse (ikke synlig før betalt booking)">
+              <input className="field" id="register-address" name="addressLine" />
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field id="register-postal" label="Postnr">
+                <input className="field" id="register-postal" name="postalCode" />
+              </Field>
+              <Field id="register-city" label="Sted">
+                <input className="field" id="register-city" name="city" defaultValue="Oslo" />
+              </Field>
+            </div>
+          </>
+        ) : (
+          <div className="card p-4">
+            <p className="font-semibold">For bedrift</p>
+            <div className="mt-2 grid gap-3">
+              <Field id="register-company" label="Firmanavn">
+                <input className="field" id="register-company" name="companyName" required={isFirm} />
+              </Field>
+              <Field id="register-org" label="Organisasjonsnummer (9 siffer)">
+                <input className="field" id="register-org" name="orgNumber" required={isFirm} />
+              </Field>
+              <Field id="register-about" label="Kort om firmaet">
+                <textarea className="field min-h-24" id="register-about" name="about" />
+              </Field>
+              <Field id="register-service-areas" label="Områder dere dekker (fritekst, vises på profil)">
+                <input className="field" id="register-service-areas" name="serviceAreas" />
+              </Field>
+            </div>
           </div>
-        </>
-      ) : (
-        <div className="card p-4">
-          <p className="font-semibold">For bedrift</p>
-          <div className="mt-2 grid gap-3">
-            <Field id="register-company" label="Firmanavn">
-              <input className="field" id="register-company" name="companyName" required={isFirm} />
-            </Field>
-            <Field id="register-org" label="Organisasjonsnummer (9 siffer)">
-              <input className="field" id="register-org" name="orgNumber" required={isFirm} />
-            </Field>
-            <Field id="register-about" label="Kort om firmaet">
-              <textarea className="field min-h-24" id="register-about" name="about" />
-            </Field>
-            <Field id="register-service-areas" label="Områder dere dekker">
-              <input className="field" id="register-service-areas" name="serviceAreas" />
-            </Field>
-          </div>
+        )}
+      </div>
+      {isFirm ? (
+        <JobAlertPreferenceFields
+          values={alerts}
+          onChange={setAlerts}
+          sectionHidden={{
+            services: firmStep !== 1,
+            geo: firmStep !== 2,
+            email: firmStep !== 3,
+          }}
+        />
+      ) : null}
+      {isFirm ? (
+        <div className="flex flex-wrap gap-2">
+          {firmStep > 0 ? (
+            <button className="btn btn-secondary" type="button" onClick={() => setFirmStep((step) => step - 1)}>
+              Tilbake
+            </button>
+          ) : null}
+          {firmStep < maxFirmStep ? (
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={(event) => {
+                const form = event.currentTarget.form;
+                if (firmStep === 0 && form && !form.reportValidity()) return;
+                setFirmStep((step) => step + 1);
+              }}
+            >
+              Neste
+            </button>
+          ) : (
+            <button className="btn btn-primary" disabled={pending} type="submit">
+              {pending ? "Oppretter…" : "Opprett konto"}
+            </button>
+          )}
+          {firmStep > 0 ? (
+            <button className="btn btn-secondary" disabled={pending} type="submit">
+              Hopp over – jeg gjør det senere
+            </button>
+          ) : null}
         </div>
+      ) : (
+        <button className="btn btn-primary" disabled={pending} type="submit">
+          {pending ? "Oppretter…" : "Opprett konto"}
+        </button>
       )}
-      <button className="btn btn-primary" disabled={pending} type="submit">
-        {pending ? "Oppretter…" : "Opprett konto"}
-      </button>
     </form>
   );
 }
@@ -215,6 +280,7 @@ type JobFormValues = {
   title?: string;
   description?: string;
   category?: string;
+  subcategory?: string;
   area?: string;
   addressLine?: string;
   postalCode?: string;
@@ -234,6 +300,7 @@ export function JobForm({
     title: initial?.title ?? "",
     description: initial?.description ?? "",
     category: initial?.category ?? "elektriker",
+    subcategory: initial?.subcategory ?? "",
     area: initial?.area ?? "Grünerløkka",
     addressLine: initial?.addressLine ?? "",
     postalCode: initial?.postalCode ?? "",
@@ -271,8 +338,38 @@ export function JobForm({
         />
       </Field>
       <Field id="job-category" label="Kategori">
-        <select className="field" id="job-category" name="category" value={values.category} onChange={set("category")}>
+        <select
+          className="field"
+          id="job-category"
+          name="category"
+          value={values.category}
+          onChange={(event) => {
+            const category = event.target.value;
+            const stillValid = childrenOf(category).some((child) => child.slug === values.subcategory);
+            setValues((current) => ({
+              ...current,
+              category,
+              subcategory: stillValid ? current.subcategory : "",
+            }));
+          }}
+        >
           {JOB_CATEGORIES.map((item) => (
+            <option key={item.slug} value={item.slug}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field id="job-subcategory" label="Underkategori (valgfritt)">
+        <select
+          className="field"
+          id="job-subcategory"
+          name="subcategory"
+          value={values.subcategory}
+          onChange={set("subcategory")}
+        >
+          <option value="">Ikke spesifisert</option>
+          {childrenOf(values.category ?? "").map((item) => (
             <option key={item.slug} value={item.slug}>
               {item.label}
             </option>

@@ -6,6 +6,9 @@ import { describeBookingMoney } from "@/lib/booking-totals";
 import { formatNok } from "@/lib/money";
 import { PageTitle, StatusBadge } from "@/components/ui";
 import { PlannedVippsProviderCopy } from "@/components/PaymentCopy";
+import { JobAlertStatusBadge } from "@/components/JobAlertStatusBadge";
+import { emailConfigured } from "@/lib/email";
+import { jobAlertSettingsHint, parsePreference } from "@/lib/job-alerts";
 
 export default async function OverviewPage() {
   const user = await getCurrentUser();
@@ -34,6 +37,15 @@ export default async function OverviewPage() {
         orderBy: { createdAt: "desc" },
       })
     : [];
+
+  const pref =
+    user.role === "PROVIDER"
+      ? await db.jobAlertPreference.findUnique({ where: { userId: user.id } })
+      : null;
+  const alertHint =
+    user.role === "PROVIDER"
+      ? jobAlertSettingsHint(pref ? parsePreference(pref) : null, emailConfigured())
+      : null;
 
   const funded = bookings.filter((booking) => ["PAID", "IN_PROGRESS", "COMPLETED"].includes(booking.status));
   const agreed = funded.reduce((sum, booking) => {
@@ -64,6 +76,28 @@ export default async function OverviewPage() {
           ? "Her ser du tilbud, bookinger og forventet utbetaling."
           : "Dine oppdrag og bookinger."}
       </PageTitle>
+
+      {user.role === "PROVIDER" && alertHint ? (
+        <section className="card space-y-3 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-serif text-xl">Jobbvarsler – hvilke oppdrag ønsker du å motta?</h2>
+            <JobAlertStatusBadge status={alertHint.status} />
+          </div>
+          <p className="text-sm text-ink-soft">
+            {alertHint.status === "AKTIVERT"
+              ? "Du får e-post når et nytt oppdrag matcher fag og område du har valgt."
+              : alertHint.status === "PAUSET"
+                ? "Varslene er satt på pause. Preferansene er lagret."
+                : "Ingen e-post sendes før du velger fag og område og slår på varsler."}
+          </p>
+          {!alertHint.emailConfigured ? (
+            <p className="text-sm text-ink-soft">E-post ikke konfigurert i dette miljøet.</p>
+          ) : null}
+          <Link href="/konto/jobbvarsler" className="btn btn-primary inline-flex w-fit">
+            Innstillinger for jobbvarsler
+          </Link>
+        </section>
+      ) : null}
 
       {user.role === "PROVIDER" ? (
         <>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatBudgetRange } from "@/lib/budget";
-import { categoryLabel } from "@/lib/categories";
+import { jobTypeFullLabel } from "@/lib/categories";
 import { formatRelativeNb, initialsFromName } from "@/lib/format";
 import { formatNok } from "@/lib/money";
 import { statusLabelNb } from "@/lib/status-labels";
@@ -87,6 +87,7 @@ export type JobCardData = {
   title: string;
   description?: string;
   category: string;
+  subcategory?: string | null;
   area: string;
   budgetMinOre: number | null;
   budgetMaxOre: number | null;
@@ -107,7 +108,7 @@ export function JobCard({
   return (
     <Link href={`/oppdrag/${job.id}`} className="card card-link flex h-full flex-col p-5">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-semibold text-moss">{categoryLabel(job.category)}</p>
+        <p className="text-sm font-semibold text-moss">{jobTypeFullLabel(job.category, job.subcategory)}</p>
         <StatusBadge status={job.status} />
       </div>
       <h2 className="mt-2 font-serif text-xl leading-snug tracking-tight">{job.title}</h2>

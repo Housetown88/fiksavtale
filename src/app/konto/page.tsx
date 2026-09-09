@@ -28,6 +28,11 @@ export default async function AccountPage() {
         <Link href="/kontakt" className="btn btn-secondary">
           Kontakt / hjelp
         </Link>
+        {full.role === "PROVIDER" ? (
+          <Link href="/konto/jobbvarsler" className="btn btn-secondary">
+            Jobbvarsler
+          </Link>
+        ) : null}
       </div>
       <div className="card p-5 text-sm sm:p-6">
         <div className="mb-3 flex items-center gap-3">

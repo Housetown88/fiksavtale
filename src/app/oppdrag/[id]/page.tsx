@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { getJobForViewer } from "@/lib/authz";
 import { canViewerSeeContact, getContactPayload } from "@/lib/contact";
-import { categoryLabel } from "@/lib/categories";
+import { jobTypeFullLabel } from "@/lib/categories";
 import { calcCommission } from "@/lib/money";
 import { getPlatformFeeBps } from "@/lib/settings";
 import { acceptOfferAction } from "@/app/actions";
@@ -55,7 +55,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
       <div>
-        <PageTitle kicker={`${categoryLabel(job.category)} · ${job.area}`} title={job.title}>
+        <PageTitle kicker={`${jobTypeFullLabel(job.category, job.subcategory)} · ${job.area}`} title={job.title}>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <StatusBadge status={job.status} />
             <span className="text-sm">Kunde: {job.customer.name}</span>

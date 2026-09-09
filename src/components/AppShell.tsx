@@ -67,6 +67,11 @@ export function AppShell({
             ) : null}
             {user ? (
               <>
+                {user.role === "PROVIDER" ? (
+                  <Link href="/konto/jobbvarsler" className="hidden text-ink-soft hover:text-ink sm:inline">
+                    Jobbvarsler
+                  </Link>
+                ) : null}
                 <Link href="/konto" className="hidden text-ink-soft hover:text-ink sm:inline">
                   {user.name}
                 </Link>

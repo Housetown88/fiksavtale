@@ -42,6 +42,7 @@ export type PublicJob = {
   title: string;
   description: string;
   category: string;
+  subcategory: string | null;
   area: string;
   postalCode: string | null;
   budgetMinOre: number | null;
@@ -60,6 +61,7 @@ export function toPublicJob(job: {
   title: string;
   description: string;
   category: string;
+  subcategory?: string | null;
   area: string;
   postalCode: string | null;
   budgetMinOre: number | null;
@@ -73,6 +75,7 @@ export function toPublicJob(job: {
     title: job.title,
     description: job.description,
     category: job.category,
+    subcategory: job.subcategory ?? null,
     area: job.area,
     postalCode: job.postalCode,
     budgetMinOre: job.budgetMinOre,
