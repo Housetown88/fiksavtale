@@ -51,4 +51,76 @@ describe("betalingsstatus-tekst", () => {
       }),
     ).toBe("PENDING");
   });
+
+  it("viser ikke suksess for PENDING tillegg på finansiert booking", () => {
+    const view = paymentConfirmView({
+      bookingStatus: "IN_PROGRESS",
+      intentStatus: "PENDING",
+      contactUnlocked: true,
+      extraCharge: true,
+      extraChargeStatus: "APPROVED",
+      intentKind: "EXTRA",
+    });
+    expect(view.title).toMatch(/ikke ferdig/i);
+    expect(view.tone).not.toBe("ok");
+    expect(view.showSimulate).toBe(true);
+    expect(view.body).not.toMatch(/merket som betalt/i);
+    expect(
+      demoIntentBadgeStatus({
+        intentStatus: "PENDING",
+        bookingStatus: "IN_PROGRESS",
+        contactUnlocked: true,
+        extraCharge: true,
+        extraChargeStatus: "APPROVED",
+      }),
+    ).toBe("PENDING");
+  });
+
+  it("viser suksess for tillegg først når ExtraCharge er PAID", () => {
+    const pendingIntent = paymentConfirmView({
+      bookingStatus: "IN_PROGRESS",
+      intentStatus: "SUCCEEDED",
+      contactUnlocked: true,
+      extraCharge: true,
+      extraChargeStatus: "APPROVED",
+      intentKind: "EXTRA",
+    });
+    expect(pendingIntent.tone).not.toBe("ok");
+    expect(pendingIntent.showSimulate).toBe(true);
+
+    const paid = paymentConfirmView({
+      bookingStatus: "IN_PROGRESS",
+      intentStatus: "SUCCEEDED",
+      contactUnlocked: true,
+      extraCharge: true,
+      extraChargeStatus: "PAID",
+      intentKind: "EXTRA",
+    });
+    expect(paid.title).toMatch(/tillegget er bekreftet/i);
+    expect(paid.tone).toBe("ok");
+    expect(paid.showSimulate).toBe(false);
+  });
+
+  it("viser feilet og avbrutt tillegg selv om hovedjobben er finansiert", () => {
+    const failed = paymentConfirmView({
+      bookingStatus: "IN_PROGRESS",
+      intentStatus: "FAILED",
+      contactUnlocked: true,
+      extraCharge: true,
+      extraChargeStatus: "APPROVED",
+    });
+    expect(failed.title).toMatch(/feilet/i);
+    expect(failed.tone).toBe("warn");
+    expect(failed.showRetry).toBe(true);
+
+    const cancelled = paymentConfirmView({
+      bookingStatus: "PAID",
+      intentStatus: "CANCELLED",
+      contactUnlocked: true,
+      extraCharge: true,
+      extraChargeStatus: "APPROVED",
+    });
+    expect(cancelled.title).toMatch(/avbrutt/i);
+    expect(cancelled.showRetry).toBe(true);
+  });
 });

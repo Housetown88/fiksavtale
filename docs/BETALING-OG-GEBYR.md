@@ -47,3 +47,16 @@ Reparasjon etter deploy — **ikke** oppdater én produksjons-id for hånd:
 
 Return-URL / GET mot bekreftelsessiden finansierer ikke — det ville brutt kontaktlåsen.
 
+## Fastlåste DEMO-tillegg (hovedjobb finansiert, tillegg venter)
+
+Symptom: `Booking.status` er `PAID` eller `IN_PROGRESS`, `ExtraCharge.status = APPROVED`, og `PaymentIntent.kind = EXTRA` er fortsatt `PENDING`. Bekreftelsessiden kunne tidligere vise «Betalingen er bekreftet» / «Tillegget er merket som betalt i DEMO» fordi hovedjobben allerede var finansiert — uten at tillegget ble betalt. Fullføring forble blokkert.
+
+Årsak (fikset i kode): bekreftelses-UI brukte bookingens finansieringsstatus (PAID/IN_PROGRESS + opplåst kontakt) også for EXTRA-intensjoner.
+
+Reparasjon etter deploy — **ikke** oppdater produksjons-id-er for hånd:
+
+1. Kunden åpner bekreftelsessiden for tilleggsintensjonen (`/booking/[id]/bekreftelse?intent=…&extra=…`) og trykker **Bekreft DEMO-betaling**. `confirmDemoPayment` kaller `applySucceededExtraFinance`: intensjon `SUCCEEDED`, `ExtraCharge` `PAID`, `EXTRA_CHARGE` + `EXTRA_COMMISSION` i oppgjørsboken, oppgjørstall synkes. Flere PENDING EXTRA-intensjoner på samme tillegg er trygge: første bekreftelse betaler, senere treff er idempotente.
+2. Hvis intensjonen allerede er `SUCCEEDED` mens tillegget fortsatt er `APPROVED`: samme knapp, eller én gang i vedlikehold `repairUnpaidApprovedExtras(db)` i `src/lib/payments.ts`. PENDING-intensjoner auto-betales **ikke** av hjelpefunksjonen — de skal bekreftes av kunden.
+
+Hovedjobbens `amountOre` og reservasjonsfinansiering endres ikke. Godkjente ubetalte tillegg blokkerer fortsatt fullføring.
+

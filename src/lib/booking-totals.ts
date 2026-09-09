@@ -115,7 +115,9 @@ export function describeBookingMoney(input: {
       ? "Historisk avtalesum"
       : summary.extrasPaidOre > 0
         ? "Totalt inkl. betalte tillegg"
-        : "Du betaler",
+        : ["PAID", "IN_PROGRESS", "COMPLETED"].includes(input.status)
+          ? "Allerede finansiert"
+          : "Du betaler",
     providerJobLabel: isHistorical ? "Historisk avtalesum" : "Avtalt jobbpris",
     providerPayoutLabel: isHistorical ? "Historisk forventet oppgjør" : "Forventet oppgjør til firma",
     refundLabel,

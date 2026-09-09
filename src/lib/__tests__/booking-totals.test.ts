@@ -78,4 +78,17 @@ describe("prisoversikt", () => {
     expect(impact.combinedOre).toBe(170_000);
     expect(impact.extraFeeOre).toBe(2_000);
   });
+
+  it("skiller allerede finansiert hovedjobb fra gjenstående tillegg", () => {
+    const money = describeBookingMoney({
+      agreedOre: 150_000,
+      extras: [{ amountOre: 20_000, status: "APPROVED" }],
+      platformFeeBps: 1000,
+      status: "IN_PROGRESS",
+    });
+    expect(money.customerPayLabel).toBe("Allerede finansiert");
+    expect(money.customerPayLabel).not.toBe("Du betaler");
+    expect(money.fundedOre).toBe(150_000);
+    expect(money.remainingToPayOre).toBe(20_000);
+  });
 });

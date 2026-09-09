@@ -7,6 +7,7 @@ import { getContactPayload } from "@/lib/contact";
 import { simulateWebhookAction, startDemoPaymentAction } from "@/app/actions";
 import { Alert, PageTitle, StatusBadge } from "@/components/ui";
 import { demoIntentBadgeStatus, paymentConfirmView } from "@/lib/payment-status-ui";
+import { describeBookingMoney } from "@/lib/booking-totals";
 import { formatNok } from "@/lib/money";
 
 export default async function PaymentConfirmPage({
@@ -27,6 +28,7 @@ export default async function PaymentConfirmPage({
     notFound();
   }
   const contact = await getContactPayload(db, { viewerId: user.id, jobId: booking.jobId });
+  const extras = await db.extraCharge.findMany({ where: { bookingId: booking.id } });
   const paymentIntent = intent
     ? await db.paymentIntent.findUnique({ where: { id: intent } })
     : null;
@@ -35,11 +37,21 @@ export default async function PaymentConfirmPage({
     : paymentIntent?.extraChargeId
       ? await db.extraCharge.findUnique({ where: { id: paymentIntent.extraChargeId } })
       : null;
+  const money = describeBookingMoney({
+    agreedOre: booking.amountOre,
+    extras,
+    platformFeeBps: booking.platformFeeBps,
+    status: booking.status,
+    refundedOre: booking.refundedOre,
+  });
   const view = paymentConfirmView({
     bookingStatus: booking.status,
     intentStatus: paymentIntent?.status ?? null,
     contactUnlocked: contact.unlocked,
     extraCharge: Boolean(extraCharge),
+    extraChargeStatus: extraCharge?.status ?? null,
+    extraChargeId: extraCharge?.id ?? paymentIntent?.extraChargeId ?? null,
+    intentKind: paymentIntent?.kind ?? null,
   });
 
   return (
@@ -60,6 +72,7 @@ export default async function PaymentConfirmPage({
                 bookingStatus: booking.status,
                 contactUnlocked: contact.unlocked,
                 extraCharge: Boolean(extraCharge),
+                extraChargeStatus: extraCharge?.status ?? null,
               })}
             />{" "}
             · {formatNok(paymentIntent.amountOre)}
@@ -68,9 +81,26 @@ export default async function PaymentConfirmPage({
           <p className="text-sm text-ink-soft">Ingen betalingsøkt er valgt.</p>
         )}
         {extraCharge ? (
-          <p className="text-sm">
-            Tillegg: {extraCharge.title} — <StatusBadge status={extraCharge.status} />
-          </p>
+          <div className="space-y-1 text-sm">
+            <p>
+              Tillegg: {extraCharge.title} — <StatusBadge status={extraCharge.status} />
+            </p>
+            <p>
+              Allerede finansiert: {formatNok(money.fundedOre)}
+              {money.extrasPaidOre > 0
+                ? ` (jobb ${formatNok(money.agreedOre)} + betalte tillegg ${formatNok(money.extrasPaidOre)})`
+                : ` (hovedjobb)`}
+            </p>
+            <p>
+              Dette tillegget: {formatNok(extraCharge.amountOre)}
+              {extraCharge.status === "PAID" ? " — betalt" : " — ikke finansiert ennå"}
+            </p>
+            {money.remainingToPayOre > 0 ? (
+              <p>Gjenstår å betale: {formatNok(money.remainingToPayOre)}</p>
+            ) : (
+              <p>Ingenting gjenstår å betale.</p>
+            )}
+          </div>
         ) : null}
         {view.tone === "ok" ? (
           <Alert tone="ok">
@@ -120,7 +150,7 @@ export default async function PaymentConfirmPage({
               <input type="hidden" name="extraChargeId" value={extraCharge.id} />
               <input type="hidden" name="outcome" value="succeeded" />
               <button className="btn btn-primary" type="submit">
-                Bekreft DEMO-tillegg
+                Bekreft DEMO-betaling
               </button>
             </form>
             <form action={simulateWebhookAction}>
@@ -130,6 +160,15 @@ export default async function PaymentConfirmPage({
               <input type="hidden" name="outcome" value="failed" />
               <button className="btn btn-secondary" type="submit">
                 Simuler feilet
+              </button>
+            </form>
+            <form action={simulateWebhookAction}>
+              <input type="hidden" name="bookingId" value={booking.id} />
+              <input type="hidden" name="intentId" value={intent} />
+              <input type="hidden" name="extraChargeId" value={extraCharge.id} />
+              <input type="hidden" name="outcome" value="cancelled" />
+              <button className="btn btn-secondary" type="submit">
+                Simuler avbrutt
               </button>
             </form>
           </div>
